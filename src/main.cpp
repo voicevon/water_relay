@@ -1,11 +1,6 @@
 #include <Arduino.h>
-#include <WiFi.h>
-#include <PubSubClient.h>
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEScan.h>
-#include <BLEAdvertisedDevice.h>
 #include <ArduinoJson.h>
+#include <SmartGateway.h>
 
 #include "config.h"
 
@@ -20,11 +15,11 @@ const int STAGE_LED_PINS[10] = {
 };
 
 // ============================================================================
-//  数据结构与类定义（骨架）
+//  数据结构与类定义
 // ============================================================================
 
 /**
- * @brief 自适应滤波与基准门限处理器（骨架）
+ * @brief 自适应滤波与基准门限处理器
  * 独立维护各通道的滑动平均滤波和慢速环境基准线跟踪。
  */
 class DataProcessor {
@@ -59,7 +54,7 @@ private:
 };
 
 /**
- * @brief 10步采样与抽空业务逻辑通道管理类（骨架）
+ * @brief 10步采样与抽空业务逻辑通道管理类
  * 独立追踪每个采样通道的状态机、定时参数、水泵继电器状态等。
  */
 class SamplingChannel {
@@ -112,7 +107,7 @@ public:
             lastPumpState = needsPump;
             if (needsPump) onCount++;
             else offCount++;
-            // TODO: 发送诊断日志
+            // 状态变更日志由 loop() 定时对比 currentStage 自动发出，此处不再耦合
         }
 
         return needsPump;
@@ -131,10 +126,6 @@ private:
 //  全局对象与变量定义
 // ============================================================================
 
-WiFiClient espClient;
-PubSubClient mqttClient(espClient);
-BLEScan* pBLEScan = nullptr;
-
 // 4通道传感器输入数据处理器
 DataProcessor processors[4];
 
@@ -145,65 +136,79 @@ SamplingChannel channels[3] = {
     SamplingChannel(2, RELAY_PIN_CH2, LED_PIN_CH2, DEFAULT_EXPECTED_DUR_CH2)
 };
 
-uint32_t lastWiFiCheck = 0;
-uint32_t lastMQTTCheck = 0;
+// 智能网关实例
+SmartGateway gateway;
+
 uint32_t lastStatusPublish = 0;
-uint8_t lastSeqNum = -1;
+int lastStages[3] = {-1, -1, -1};
 
 // ============================================================================
-//  WiFi 与 MQTT 连接机制（骨架）
+//  网关事件回调处理
 // ============================================================================
 
-void setupWiFi() {
-    Serial.println("Initializing WiFi...");
-    // TODO: 实现非阻塞 WiFi STA 初始化
+// 1. 接收到 BLE 传感器广播触摸原生值
+void handleSensorData(uint16_t ch0, uint16_t ch1, uint16_t ch2, uint16_t ch3) {
+    Serial.printf("[APP BLE] handleSensorData: ch0=%u, ch1=%u, ch2=%u, ch3=%u\n", ch0, ch1, ch2, ch3);
+    processors[0].pushRaw(ch0);
+    processors[1].pushRaw(ch1);
+    processors[2].pushRaw(ch2);
+    processors[3].pushRaw(ch3);
 }
 
-void checkWiFi() {
-    if (millis() - lastWiFiCheck >= 5000) {
-        lastWiFiCheck = millis();
-        // TODO: 非阻塞检查网络连接状态，断开时自动重连
+// 2. 接收到 MQTT 配置更改预期总时长
+void handleConfigDuration(int channelId, float durationMinutes) {
+    for (int i = 0; i < 3; i++) {
+        if (channels[i].id == channelId) {
+            uint32_t newDur = (uint32_t)(durationMinutes * 60.0f);
+            channels[i].updateParameters(newDur, channels[i].pumpWorkTime);
+            Serial.printf("[CONFIG] Channel %d duration updated to %d sec via MQTT.\n", channelId, newDur);
+            break;
+        }
     }
 }
 
-void mqttCallback(char* topic, byte* payload, unsigned int length) {
-    // TODO: 实现接收 MQTT 配置消息，包括时长(duration)及泵启动时间(pump_time)，动态调用 updateParameters()
-}
-
-void checkMQTT() {
-    if (millis() - lastMQTTCheck >= MQTT_RECONNECT_INTERVAL_MS) {
-        lastMQTTCheck = millis();
-        // TODO: 检查 MQTT 连接并执行非阻塞重连与订阅订阅主题
+// 3. 接收到 MQTT 配置更改单次泵开启时长
+void handleConfigPumpTime(int channelId, float pumpTimeSeconds) {
+    for (int i = 0; i < 3; i++) {
+        if (channels[i].id == channelId) {
+            uint32_t newPump = (uint32_t)pumpTimeSeconds;
+            channels[i].updateParameters(channels[i].expectedDuration, newPump);
+            Serial.printf("[CONFIG] Channel %d pump work time updated to %d sec via MQTT.\n", channelId, newPump);
+            break;
+        }
     }
 }
 
+// 4. 定时发布状态数据 (JSON 格式)
 void publishStatus() {
     if (millis() - lastStatusPublish >= 30000) {
         lastStatusPublish = millis();
-        // TODO: 使用 StaticJsonDocument 组装包含 uptime, channels[i] 所有状态及传感器数值的 JSON 负载
-        // TODO: 发布到 water_brain/system/status
+        
+        StaticJsonDocument<512> doc;
+        doc["uptime_seconds"] = millis() / 1000;
+        doc["ble_connected"] = gateway.isBleConnected();
+        
+        JsonArray channelsArr = doc.createNestedArray("channels");
+        for (int i = 0; i < 3; i++) {
+            JsonObject chObj = channelsArr.createNestedObject();
+            chObj["id"] = channels[i].id;
+            chObj["active"] = channels[i].active;
+            chObj["stage"] = channels[i].currentStage;
+            chObj["pump_on"] = channels[i].lastPumpState;
+            chObj["on_count"] = channels[i].onCount;
+            chObj["detected"] = channels[i].isDetected;
+            
+            // 获取对应的传感器物理通道索引并填充值
+            int sensorCh = (i == 0) ? SENSOR_MAP_PUMP_0 : ((i == 1) ? SENSOR_MAP_PUMP_1 : SENSOR_MAP_PUMP_2);
+            chObj["raw"] = processors[sensorCh].getFiltered(); // 默认填充滤波值或原生值
+            chObj["filtered"] = processors[sensorCh].getFiltered();
+            chObj["baseline"] = processors[sensorCh].getBaseline();
+        }
+        
+        String jsonPayload;
+        serializeJson(doc, jsonPayload);
+        gateway.publishStatus(jsonPayload.c_str());
     }
-}
-
-// ============================================================================
-//  BLE 广告包扫描回调（骨架）
-// ============================================================================
-
-class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
-    void onResult(BLEAdvertisedDevice advertisedDevice) {
-        // TODO: 过滤设备名称为 TARGET_BLE_NAME
-        // TODO: 提取厂商自定义数据，判断 Company ID 是否为 0xFFFF 并且序列号发生变化
-        // TODO: 解析大端序的 Ch0~Ch3 原始值，将其推入数据处理器中更新滤波
-    }
-};
-
-void setupBLE() {
-    BLEDevice::init("");
-    pBLEScan = BLEDevice::getScan();
-    pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks(), true);
-    pBLEScan->setActiveScan(true);
-    pBLEScan->setInterval(100);
-    pBLEScan->setWindow(99);
 }
 
 // ============================================================================
@@ -228,24 +233,43 @@ void setup() {
         digitalWrite(STAGE_LED_PINS[i], LOW);   // 默认关闭阶段指示灯
     }
 
-    // 初始化各个通信组件
-    setupWiFi();
-    mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
-    mqttClient.setCallback(mqttCallback);
-    
-    setupBLE();
+    // 注册网关事件回调函数
+    gateway.onSensorData(handleSensorData);
+    gateway.onConfigDuration(handleConfigDuration);
+    gateway.onConfigPumpTime(handleConfigPumpTime);
+
+    // 启动网关网络通信
+    pinMode(STATUS_LED_PIN, OUTPUT);
+    digitalWrite(STATUS_LED_PIN, LOW); // 默认关闭状态指示灯
+    gateway.begin();
 }
 
 void loop() {
-    // 维持网络连接
-    checkWiFi();
-    if (WiFi.status() == WL_CONNECTED) {
-        checkMQTT();
-        mqttClient.loop();
+    // 维持网关心跳（自动处理 WiFi/MQTT 连接及非阻塞 BLE 扫描）
+    gateway.loop();
+
+    // 维持状态指示灯 LED 闪烁逻辑 (板载 LED, GPIO 2)
+    unsigned long now = millis();
+    NetworkState netState = gateway.getNetworkState();
+    unsigned long period = 0;
+
+    if (netState == STATE_WIFI_CONNECTED || netState == STATE_MQTT_CONNECTING) {
+        period = 2000; // WiFi 已连接，MQTT 未连接：2 秒周期
+    } else if (netState == STATE_MQTT_CONNECTED) {
+        period = 1000; // WiFi 与 MQTT 均连接：1 秒周期
+    } else {
+        period = 0;    // 未连接 WiFi，常闭
     }
 
-    // 触发非阻塞扫描
-    pBLEScan->start(BLE_SCAN_DURATION_S, false);
+    if (period == 0) {
+        digitalWrite(STATUS_LED_PIN, LOW);
+    } else {
+        if ((now % period) < (period / 2)) {
+            digitalWrite(STATUS_LED_PIN, HIGH);
+        } else {
+            digitalWrite(STATUS_LED_PIN, LOW);
+        }
+    }
 
     // 映射对应传感数据到继电器状态机，并计算结果
     bool channelPumps[3] = {false, false, false};
@@ -275,7 +299,17 @@ void loop() {
         digitalWrite(STAGE_LED_PINS[stage], (stage == activeStage) ? HIGH : LOW);
     }
 
-    // 定期上报系统状态 JSON
+    // 4. 检测状态跳转并发送 MQTT 诊断日志
+    for (int i = 0; i < 3; i++) {
+        if (channels[i].currentStage != lastStages[i]) {
+            lastStages[i] = channels[i].currentStage;
+            char logMsg[64];
+            snprintf(logMsg, sizeof(logMsg), "通道%d 状态跳转 -> Stage %d", i, channels[i].currentStage);
+            gateway.publishLog(channels[i].id, logMsg);
+        }
+    }
+
+    // 5. 定期上报系统状态 JSON (30 秒)
     publishStatus();
 
     delay(10);

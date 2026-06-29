@@ -28,6 +28,9 @@
 #define LED_PIN_STAGE_8  33
 #define LED_PIN_STAGE_9  5
 
+// 系统运行状态指示灯 (板载 LED)
+#define STATUS_LED_PIN   2
+
 // -------- 传感器通道对齐映射表 --------
 // 传感器节点 FengBLE 广播 4 个通道 (Ch0~Ch3)
 // 这里映射哪三个传感器通道到我们的 3 路水泵控制 (0~2)
@@ -79,6 +82,6 @@
 #define MQTT_RECONNECT_INTERVAL_MS  5000UL
 
 // -------- 系统运行诊断配置 --------
-#define CORE_DEBUG_LEVEL 3
+#define CORE_DEBUG_LEVEL 1
 
 #endif // CONFIG_H

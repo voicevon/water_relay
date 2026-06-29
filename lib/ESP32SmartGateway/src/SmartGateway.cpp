@@ -80,6 +80,10 @@ bool SmartGateway::isBleConnected() const {
     return _bleConnected;
 }
 
+NetworkState SmartGateway::getNetworkState() {
+    return _netManager.getState();
+}
+
 void SmartGateway::mqttCallback(char* topic, byte* payload, unsigned int length) {
     if (_instance) {
         _instance->handleMqttMessage(topic, payload, length);

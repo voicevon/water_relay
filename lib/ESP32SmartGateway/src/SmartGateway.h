@@ -35,6 +35,9 @@ public:
     // 查询蓝牙连接状态
     bool isBleConnected() const;
 
+    // 查询网络状态
+    NetworkState getNetworkState();
+
 private:
     static SmartGateway* _instance;
     
