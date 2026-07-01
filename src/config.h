@@ -41,7 +41,7 @@
 // -------- 滤波与基准门限配置 (自适应电容触发算法) --------
 #define MA_WINDOW_SIZE       50     // 滑动平滑窗口大小
 #define BASELINE_WINDOW_SIZE 200    // 基准追踪慢窗口大小
-#define THRESHOLD_OFFSET_VAL 5000   // 触发阈值偏差 (baseline - offset)
+#define THRESHOLD_OFFSET_VAL 50     // 触发阈值偏差 (baseline - offset)
 
 // -------- 10阶段采样与抽空时间常量配置 --------
 #define STABILIZATION_TIME_SEC   180    // 稳定触发等待时间（秒，默认3分钟，对应 Stage 1）

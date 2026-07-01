@@ -3,6 +3,7 @@
 #include <SmartGateway.h>
 
 #include "config.h"
+#include "Sensor.h"
 
 // ============================================================================
 //  GPIO 直接控制引脚定义
@@ -17,41 +18,6 @@ const int STAGE_LED_PINS[10] = {
 // ============================================================================
 //  数据结构与类定义
 // ============================================================================
-
-/**
- * @brief 自适应滤波与基准门限处理器
- * 独立维护各通道的滑动平均滤波和慢速环境基准线跟踪。
- */
-class DataProcessor {
-public:
-    DataProcessor() {
-        // TODO: 初始化滑动平均与基准线滑动缓冲区
-    }
-
-    /**
-     * @brief 输入最新原生值，进行滑动滤波并更新基准线
-     */
-    void pushRaw(uint16_t rawValue) {
-        // TODO: 计算 50 窗口滑动平均 -> filteredValue
-        // TODO: 计算 200 窗口慢速滑动平均 -> baselineValue
-    }
-
-    uint16_t getFiltered() const { return filteredValue; }
-    uint16_t getBaseline() const { return baselineValue; }
-    uint16_t getThreshold() const { return baselineValue - THRESHOLD_OFFSET_VAL; }
-
-    /**
-     * @brief 判断当前滤波值是否低于阈值（水流接触判断）
-     */
-    bool isDetected() const {
-        return filteredValue <= getThreshold();
-    }
-
-private:
-    uint16_t filteredValue = 0;
-    uint16_t baselineValue = 0;
-    // TODO: 声明历史滑动窗口环形缓冲区
-};
 
 /**
  * @brief 10步采样与抽空业务逻辑通道管理类
@@ -127,7 +93,12 @@ private:
 // ============================================================================
 
 // 4通道传感器输入数据处理器
-DataProcessor processors[4];
+Sensor sensors[4] = {
+    Sensor(0, THRESHOLD_OFFSET_VAL),
+    Sensor(1, THRESHOLD_OFFSET_VAL),
+    Sensor(2, THRESHOLD_OFFSET_VAL),
+    Sensor(3, THRESHOLD_OFFSET_VAL)
+};
 
 // 3通道本地继电器与指示灯物理状态机
 SamplingChannel channels[3] = {
@@ -149,10 +120,10 @@ int lastStages[3] = {-1, -1, -1};
 // 1. 接收到 BLE 传感器广播触摸原生值
 void handleSensorData(uint16_t ch0, uint16_t ch1, uint16_t ch2, uint16_t ch3) {
     Serial.printf("[APP BLE] handleSensorData: ch0=%u, ch1=%u, ch2=%u, ch3=%u\n", ch0, ch1, ch2, ch3);
-    processors[0].pushRaw(ch0);
-    processors[1].pushRaw(ch1);
-    processors[2].pushRaw(ch2);
-    processors[3].pushRaw(ch3);
+    sensors[0].pushRaw(ch0);
+    sensors[1].pushRaw(ch1);
+    sensors[2].pushRaw(ch2);
+    sensors[3].pushRaw(ch3);
 }
 
 // 2. 接收到 MQTT 配置更改预期总时长
@@ -200,14 +171,30 @@ void publishStatus() {
             
             // 获取对应的传感器物理通道索引并填充值
             int sensorCh = (i == 0) ? SENSOR_MAP_PUMP_0 : ((i == 1) ? SENSOR_MAP_PUMP_1 : SENSOR_MAP_PUMP_2);
-            chObj["raw"] = processors[sensorCh].getFiltered(); // 默认填充滤波值或原生值
-            chObj["filtered"] = processors[sensorCh].getFiltered();
-            chObj["baseline"] = processors[sensorCh].getBaseline();
+            chObj["raw"] = sensors[sensorCh].getRaw(); 
+            chObj["filtered"] = sensors[sensorCh].getFiltered();
+            chObj["baseline"] = sensors[sensorCh].getBaseline();
         }
         
         String jsonPayload;
         serializeJson(doc, jsonPayload);
         gateway.publishStatus(jsonPayload.c_str());
+    }
+}
+
+// 5. 传感器状态变化事件回调
+void handleSensorStateChange(int sensorId, SensorState newState) {
+    bool hasWater = (newState == SensorState::HAS_WATER);
+    Serial.printf("[APP SENSOR] Sensor %d state changed to %s\n", sensorId, hasWater ? "HAS_WATER" : "NO_WATER");
+    
+    // 检查是否有控制通道绑定了该传感器，并在改变时发布 MQTT 日志
+    for (int i = 0; i < 3; i++) {
+        int mappedSensor = (i == 0) ? SENSOR_MAP_PUMP_0 : ((i == 1) ? SENSOR_MAP_PUMP_1 : SENSOR_MAP_PUMP_2);
+        if (sensorId == mappedSensor) {
+            char logMsg[64];
+            snprintf(logMsg, sizeof(logMsg), "通道%d 传感器检测到%s", i, hasWater ? "有水" : "无水");
+            gateway.publishLog(channels[i].id, logMsg);
+        }
     }
 }
 
@@ -237,6 +224,11 @@ void setup() {
     gateway.onSensorData(handleSensorData);
     gateway.onConfigDuration(handleConfigDuration);
     gateway.onConfigPumpTime(handleConfigPumpTime);
+
+    // 注册传感器变化回调
+    for (int i = 0; i < 4; i++) {
+        sensors[i].onStateChange(handleSensorStateChange);
+    }
 
     // 启动网关网络通信
     pinMode(STATUS_LED_PIN, OUTPUT);
@@ -275,11 +267,11 @@ void loop() {
     bool channelPumps[3] = {false, false, false};
     
     // 通道 0：对应 SENSOR_MAP_PUMP_0 的传感器输入
-    channelPumps[0] = channels[0].update(processors[SENSOR_MAP_PUMP_0].isDetected());
+    channelPumps[0] = channels[0].update(sensors[SENSOR_MAP_PUMP_0].isDetected());
     // 通道 1：对应 SENSOR_MAP_PUMP_1 的传感器输入
-    channelPumps[1] = channels[1].update(processors[SENSOR_MAP_PUMP_1].isDetected());
+    channelPumps[1] = channels[1].update(sensors[SENSOR_MAP_PUMP_1].isDetected());
     // 通道 2：对应 SENSOR_MAP_PUMP_2 的传感器输入
-    channelPumps[2] = channels[2].update(processors[SENSOR_MAP_PUMP_2].isDetected());
+    channelPumps[2] = channels[2].update(sensors[SENSOR_MAP_PUMP_2].isDetected());
 
     // 1. 直接控制 3 路水泵继电器引脚与 3 路传感器指示 LED
     for (int i = 0; i < 3; i++) {
