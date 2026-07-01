@@ -4,6 +4,7 @@
 
 #include "config.h"
 #include "Sensor.h"
+#include "SamplingController.h"
 
 // ============================================================================
 //  GPIO 直接控制引脚定义
@@ -13,79 +14,6 @@
 const int STAGE_LED_PINS[10] = {
     LED_PIN_STAGE_0, LED_PIN_STAGE_1, LED_PIN_STAGE_2, LED_PIN_STAGE_3, LED_PIN_STAGE_4,
     LED_PIN_STAGE_5, LED_PIN_STAGE_6, LED_PIN_STAGE_7, LED_PIN_STAGE_8, LED_PIN_STAGE_9
-};
-
-// ============================================================================
-//  数据结构与类定义
-// ============================================================================
-
-/**
- * @brief 10步采样与抽空业务逻辑通道管理类
- * 独立追踪每个采样通道的状态机、定时参数、水泵继电器状态等。
- */
-class SamplingChannel {
-public:
-    int id;
-    int relayPin; // 物理 GPIO 引脚
-    int ledPin;   // 物理 GPIO 引脚
-    uint32_t expectedDuration;
-    uint32_t pumpWorkTime;
-    float safetyFactor;
-    
-    // 状态机运行时参数
-    int currentStage = 0;  // 0: 空闲, 1: 待稳, 2: 取头样, 3: 延时1, 4: 取中样, 5: 延时2, 6: 取尾样, 7: 等信号丢, 8: 排空, 9: 结束
-    bool active = false;
-    bool isDetected = false;
-    bool lastPumpState = false;
-    uint32_t onCount = 0;
-    uint32_t offCount = 0;
-
-    SamplingChannel(int chId, int rPin, int lPin, uint32_t defaultDur) 
-        : id(chId), relayPin(rPin), ledPin(lPin), expectedDuration(defaultDur), 
-          pumpWorkTime(DEFAULT_PUMP_WORK_SEC), safetyFactor(DEFAULT_SAFETY_FACTOR) {}
-
-    /**
-     * @brief 更新该通道的配置参数并重算休眠周期
-     */
-    void updateParameters(uint32_t newDur, uint32_t newPumpTime) {
-        expectedDuration = newDur;
-        pumpWorkTime = newPumpTime;
-        calculateStages();
-    }
-
-    /**
-     * @brief 核心状态机更新函数（10步采样算法骨架）
-     * @param detected 传感器滤波后自适应判定结果
-     * @return bool 是否需要运行水泵
-     */
-    bool update(bool detected) {
-        isDetected = detected;
-        // TODO: 实现 10 步采样状态机跳转：
-        // Stage 0 -> (detected) -> Stage 1 (稳定期等待 180s) -> Stage 2 (取头样泵开 10s) 
-        // -> Stage 3 (休眠 rest_time) -> Stage 4 (取中样泵开 10s) -> Stage 5 (休眠 rest_time)
-        // -> Stage 6 (取尾样泵开 10s) -> Stage 7 (等信号丢失 180s) -> Stage 8 (排空抽空 10s)
-        // -> Stage 9 (结束，等待信号断开 detected==false 后复位回到 Stage 0)
-
-        bool needsPump = false;
-        
-        // 状态更新守卫
-        if (needsPump != lastPumpState) {
-            lastPumpState = needsPump;
-            if (needsPump) onCount++;
-            else offCount++;
-            // 状态变更日志由 loop() 定时对比 currentStage 自动发出，此处不再耦合
-        }
-
-        return needsPump;
-    }
-
-private:
-    uint32_t stageTimes[5]; // 计算出的采样工作和休眠序列时间片
-    
-    void calculateStages() {
-        // TODO: 实现 available_time = expectedDuration * safetyFactor - STABILIZATION_TIME_SEC
-        // TODO: 实现 rest_time = (available_time - pumpWorkTime * 3) / 2 并填充时间序列
-    }
 };
 
 // ============================================================================
@@ -101,10 +29,10 @@ Sensor sensors[4] = {
 };
 
 // 3通道本地继电器与指示灯物理状态机
-SamplingChannel channels[3] = {
-    SamplingChannel(1, RELAY_PIN_CH0, LED_PIN_CH0, DEFAULT_EXPECTED_DUR_CH0),
-    SamplingChannel(2, RELAY_PIN_CH1, LED_PIN_CH1, DEFAULT_EXPECTED_DUR_CH1),
-    SamplingChannel(3, RELAY_PIN_CH2, LED_PIN_CH2, DEFAULT_EXPECTED_DUR_CH2)
+SamplingController channels[3] = {
+    SamplingController(1, RELAY_PIN_CH0, LED_PIN_CH0, DEFAULT_EXPECTED_DUR_CH0),
+    SamplingController(2, RELAY_PIN_CH1, LED_PIN_CH1, DEFAULT_EXPECTED_DUR_CH1),
+    SamplingController(3, RELAY_PIN_CH2, LED_PIN_CH2, DEFAULT_EXPECTED_DUR_CH2)
 };
 
 // 智能网关实例
