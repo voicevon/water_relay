@@ -112,6 +112,7 @@ void SmartGateway::handleMqttMessage(char* topic, byte* payload, unsigned int le
     String topicStr(topic);
 
     if (_sensorSource == SensorSource::MQTT && topicStr == MQTT_SENSOR_DATA_SUB) {
+        Serial.print("MQTT RX ");
         StaticJsonDocument<256> doc;
         DeserializationError error = deserializeJson(doc, payload, length);
         if (!error) {
@@ -138,13 +139,13 @@ void SmartGateway::handleMqttMessage(char* topic, byte* payload, unsigned int le
     }
     float value = valStr.toFloat();
 
-    if (topicStr.startsWith("water_brain/config/duration/")) {
-        int channelId = topicStr.substring(String("water_brain/config/duration/").length()).toInt();
+    if (topicStr.startsWith(MQTT_DURATION_PREFIX)) {
+        int channelId = topicStr.substring(String(MQTT_DURATION_PREFIX).length()).toInt();
         if (_durationCb) {
             _durationCb(channelId, value);
         }
-    } else if (topicStr.startsWith("water_brain/config/pump_time/")) {
-        int channelId = topicStr.substring(String("water_brain/config/pump_time/").length()).toInt();
+    } else if (topicStr.startsWith(MQTT_PUMP_TIME_PREFIX)) {
+        int channelId = topicStr.substring(String(MQTT_PUMP_TIME_PREFIX).length()).toInt();
         if (_pumpTimeCb) {
             _pumpTimeCb(channelId, value);
         }

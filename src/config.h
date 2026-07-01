@@ -34,9 +34,9 @@
 // -------- 传感器通道对齐映射表 --------
 // 传感器节点 FengBLE 广播 4 个通道 (Ch0~Ch3)
 // 这里映射哪三个传感器通道到我们的 3 路水泵控制 (0~2)
-#define SENSOR_MAP_PUMP_0   3   // UI Ch4 (物理 Ch3) -> 水泵继电器 0
-#define SENSOR_MAP_PUMP_1   2   // UI Ch3 (物理 Ch2) -> 水泵继电器 1
-#define SENSOR_MAP_PUMP_2   1   // UI Ch2 (物理 Ch1) -> 水泵继电器 2
+#define SENSOR_MAP_PUMP_0   0   // 物理 Ch0 -> 水泵继电器 0
+#define SENSOR_MAP_PUMP_1   1   // 物理 Ch1 -> 水泵继电器 1
+#define SENSOR_MAP_PUMP_2   2   // 物理 Ch2 -> 水泵继电器 2
 
 // -------- 滤波与基准门限配置 (自适应电容触发算法) --------
 #define MA_WINDOW_SIZE       50     // 滑动平滑窗口大小
@@ -70,13 +70,15 @@
 #define MQTT_PASSWORD   "" // 视环境决定
 
 // -------- MQTT 主题定义 --------
-#define MQTT_STATUS_TOPIC    "water_brain/system/status"
-#define MQTT_INFO_TOPIC      "water_brain/system/info"
-#define MQTT_LOG_PREFIX      "water_brain/log"
+#define MQTT_STATUS_TOPIC    "water/" STATION_NAME "/system/status"
+#define MQTT_INFO_TOPIC      "water/" STATION_NAME "/system/info"
+#define MQTT_LOG_PREFIX      "water/" STATION_NAME "/log"
 
 // 订阅远程配置的主题前缀
-#define MQTT_DURATION_SUB    "water_brain/config/duration/+"
-#define MQTT_PUMP_TIME_SUB   "water_brain/config/pump_time/+"
+#define MQTT_DURATION_PREFIX  "water/" STATION_NAME "/config/duration/"
+#define MQTT_PUMP_TIME_PREFIX "water/" STATION_NAME "/config/pump_time/"
+#define MQTT_DURATION_SUB     MQTT_DURATION_PREFIX "+"
+#define MQTT_PUMP_TIME_SUB    MQTT_PUMP_TIME_PREFIX "+"
 
 // 站点名称定义（作为过滤依据）
 #define STATION_NAME         "dongzhan"

@@ -102,13 +102,13 @@ Sensor sensors[4] = {
 
 // 3通道本地继电器与指示灯物理状态机
 SamplingChannel channels[3] = {
-    SamplingChannel(0, RELAY_PIN_CH0, LED_PIN_CH0, DEFAULT_EXPECTED_DUR_CH0),
-    SamplingChannel(1, RELAY_PIN_CH1, LED_PIN_CH1, DEFAULT_EXPECTED_DUR_CH1),
-    SamplingChannel(2, RELAY_PIN_CH2, LED_PIN_CH2, DEFAULT_EXPECTED_DUR_CH2)
+    SamplingChannel(1, RELAY_PIN_CH0, LED_PIN_CH0, DEFAULT_EXPECTED_DUR_CH0),
+    SamplingChannel(2, RELAY_PIN_CH1, LED_PIN_CH1, DEFAULT_EXPECTED_DUR_CH1),
+    SamplingChannel(3, RELAY_PIN_CH2, LED_PIN_CH2, DEFAULT_EXPECTED_DUR_CH2)
 };
 
 // 智能网关实例
-SmartGateway gateway(SensorSource::BLE);
+SmartGateway gateway(SensorSource::MQTT);
 
 uint32_t lastStatusPublish = 0;
 int lastStages[3] = {-1, -1, -1};
@@ -117,13 +117,18 @@ int lastStages[3] = {-1, -1, -1};
 //  网关事件回调处理
 // ============================================================================
 
-// 1. 接收到 BLE 传感器广播触摸原生值
+// 1. 接收到网关传感器数据
 void handleSensorData(uint16_t ch0, uint16_t ch1, uint16_t ch2, uint16_t ch3) {
-    Serial.printf("[APP BLE] handleSensorData: ch0=%u, ch1=%u, ch2=%u, ch3=%u\n", ch0, ch1, ch2, ch3);
     sensors[0].pushRaw(ch0);
     sensors[1].pushRaw(ch1);
     sensors[2].pushRaw(ch2);
     sensors[3].pushRaw(ch3);
+
+    Serial.printf("[APP GATEWAY] ch0=%u,%u,%u,%u ch1=%u,%u,%u,%u ch2=%u,%u,%u,%u ch3=%u,%u,%u,%u\n",
+                  sensors[0].getRaw(), sensors[0].getFiltered(), sensors[0].getBaseline(), sensors[0].getThreshold(),
+                  sensors[1].getRaw(), sensors[1].getFiltered(), sensors[1].getBaseline(), sensors[1].getThreshold(),
+                  sensors[2].getRaw(), sensors[2].getFiltered(), sensors[2].getBaseline(), sensors[2].getThreshold(),
+                  sensors[3].getRaw(), sensors[3].getFiltered(), sensors[3].getBaseline(), sensors[3].getThreshold());
 }
 
 // 2. 接收到 MQTT 配置更改预期总时长
@@ -185,7 +190,7 @@ void publishStatus() {
 // 5. 传感器状态变化事件回调
 void handleSensorStateChange(int sensorId, SensorState newState) {
     bool hasWater = (newState == SensorState::HAS_WATER);
-    Serial.printf("[APP SENSOR] Sensor %d state changed to %s\n", sensorId, hasWater ? "HAS_WATER" : "NO_WATER");
+    Serial.printf("\n[APP SENSOR] Sensor %d state changed to %s\n", sensorId, hasWater ? "HAS_WATER" : "NO_WATER");
     
     // 检查是否有控制通道绑定了该传感器，并在改变时发布 MQTT 日志
     for (int i = 0; i < 3; i++) {
