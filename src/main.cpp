@@ -46,13 +46,13 @@ int lastStages[3] = {-1, -1, -1};
 // ============================================================================
 
 // 1. 接收到网关传感器数据
-void handleSensorData(uint16_t ch0, uint16_t ch1, uint16_t ch2, uint16_t ch3) {
-    sensors[0].pushRaw(ch0);
-    sensors[1].pushRaw(ch1);
-    sensors[2].pushRaw(ch2);
-    sensors[3].pushRaw(ch3);
+void handleSensorData(uint16_t sensor1, uint16_t sensor2, uint16_t sensor3, uint16_t sensor4) {
+    sensors[0].pushRaw(sensor1);
+    sensors[1].pushRaw(sensor2);
+    sensors[2].pushRaw(sensor3);
+    sensors[3].pushRaw(sensor4);
 
-    Serial.printf("[APP GATEWAY] ch0=%u,%u,%u,%u ch1=%u,%u,%u,%u ch2=%u,%u,%u,%u ch3=%u,%u,%u,%u\n",
+    Serial.printf("[APP GATEWAY]   #1=%u,%u,%u,%u   #2=%u,%u,%u,%u   #3=%u,%u,%u,%u   #4=%u,%u,%u,%u\n",
                   sensors[0].getRaw(), sensors[0].getFiltered(), sensors[0].getBaseline(), sensors[0].getThreshold(),
                   sensors[1].getRaw(), sensors[1].getFiltered(), sensors[1].getBaseline(), sensors[1].getThreshold(),
                   sensors[2].getRaw(), sensors[2].getFiltered(), sensors[2].getBaseline(), sensors[2].getThreshold(),

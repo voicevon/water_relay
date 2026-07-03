@@ -17,7 +17,7 @@ enum class SensorSource {
 class SmartGateway {
 public:
     // 事件回调函数指针定义
-    typedef void (*SensorDataCallback)(uint16_t ch0, uint16_t ch1, uint16_t ch2, uint16_t ch3);
+    typedef void (*SensorDataCallback)(uint16_t sensor1, uint16_t sensor2, uint16_t sensor3, uint16_t sensor4);
     typedef void (*ConfigDurationCallback)(int channelId, float durationMinutes);
     typedef void (*ConfigPumpTimeCallback)(int channelId, float pumpTimeSeconds);
 

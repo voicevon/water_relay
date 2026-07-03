@@ -118,12 +118,12 @@ void SmartGateway::handleMqttMessage(char* topic, byte* payload, unsigned int le
         if (!error) {
             const char* name = doc["name"] | "";
             if (strcmp(name, STATION_NAME) == 0) {
-                uint16_t ch0 = doc["ch1"] | 0;
-                uint16_t ch1 = doc["ch2"] | 0;
-                uint16_t ch2 = doc["ch3"] | 0;
-                uint16_t ch3 = doc["ch4"] | 0;
+                uint16_t sensor1 = doc["sensor1"] | 0;
+                uint16_t sensor2 = doc["sensor2"] | 0;
+                uint16_t sensor3 = doc["sensor3"] | 0;
+                uint16_t sensor4 = doc["sensor4"] | 0;
                 if (_sensorCb) {
-                    _sensorCb(ch0, ch1, ch2, ch3);
+                    _sensorCb(sensor1, sensor2, sensor3, sensor4);
                 }
             }
         } else {
@@ -178,13 +178,13 @@ void SmartGateway::AdvertisedDeviceCallbacks::onResult(BLEAdvertisedDevice adver
 
                         Serial.printf("[GATEWAY BLE] 接收到唯一广播包, seqNum=%u\n", seqNum);
 
-                        uint16_t ch0 = ((uint8_t)data[2] << 8) | (uint8_t)data[3];
-                        uint16_t ch1 = ((uint8_t)data[4] << 8) | (uint8_t)data[5];
-                        uint16_t ch2 = ((uint8_t)data[6] << 8) | (uint8_t)data[7];
-                        uint16_t ch3 = ((uint8_t)data[8] << 8) | (uint8_t)data[9];
+                        uint16_t sensor1 = ((uint8_t)data[2] << 8) | (uint8_t)data[3];
+                        uint16_t sensor2 = ((uint8_t)data[4] << 8) | (uint8_t)data[5];
+                        uint16_t sensor3 = ((uint8_t)data[6] << 8) | (uint8_t)data[7];
+                        uint16_t sensor4 = ((uint8_t)data[8] << 8) | (uint8_t)data[9];
 
                         if (_instance->_sensorCb) {
-                            _instance->_sensorCb(ch0, ch1, ch2, ch3);
+                            _instance->_sensorCb(sensor1, sensor2, sensor3, sensor4);
                         }
                     }
                 }
