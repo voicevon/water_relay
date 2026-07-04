@@ -60,28 +60,20 @@
 #define BLE_SCAN_DURATION_S  5      // 单次扫描时长（秒）
 
 // -------- WiFi 网络配置 --------
-#define WIFI_SSID       "Perfect"
-#define WIFI_PASSWORD   "12344321"
+#define FACTORY_WIFI_SSID       "Perfect"
+#define FACTORY_WIFI_PASSWORD   "12344321"
+
+#define FACTORY_WIFI_AP_SSID    "AP_Relay"
+#define FACTORY_WIFI_AP_PASSWORD "12344321"
 
 // -------- MQTT Broker 配置 --------
-#define MQTT_BROKER     "voicevon.vicp.io"
-#define MQTT_PORT       1883
-#define MQTT_USERNAME   "von"
-#define MQTT_PASSWORD   "" // 视环境决定
-
-// -------- MQTT 主题定义 --------
-#define MQTT_STATUS_TOPIC    "water/" STATION_NAME "/system/status"
-#define MQTT_INFO_TOPIC      "water/" STATION_NAME "/system/info"
-#define MQTT_LOG_PREFIX      "water/" STATION_NAME "/log"
-
-// 订阅远程配置的主题前缀
-#define MQTT_DURATION_PREFIX  "water/" STATION_NAME "/config/duration/"
-#define MQTT_PUMP_TIME_PREFIX "water/" STATION_NAME "/config/pump_time/"
-#define MQTT_DURATION_SUB     MQTT_DURATION_PREFIX "+"
-#define MQTT_PUMP_TIME_SUB    MQTT_PUMP_TIME_PREFIX "+"
+#define FACTORY_MQTT_BROKER     "voicevon.vicp.io"
+#define FACTORY_MQTT_PORT       1883
+#define FACTORY_MQTT_USERNAME   "von"
+#define FACTORY_MQTT_PASSWORD   "" // 视环境决定
 
 // 站点名称定义（作为过滤依据）
-#define STATION_NAME         "dongzhan"
+#define FACTORY_STATION_NAME         "dongzhan"
 // 订阅传感器数据的主题（以 water_Android 为准）
 #define MQTT_SENSOR_DATA_SUB "water/sensor/status"
 

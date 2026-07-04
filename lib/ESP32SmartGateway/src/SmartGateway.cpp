@@ -1,5 +1,6 @@
 #include "SmartGateway.h"
 #include "../../../src/config.h"
+#include "../../../src/web_config.h"
 #include <ArduinoJson.h>
 
 // 初始化单例指针
@@ -23,12 +24,24 @@ SmartGateway::SmartGateway(SensorSource source) : _netManager(_espClient), _sens
 
 void SmartGateway::begin() {
     NetworkConfig netConfig;
-    netConfig.wifiSsid = WIFI_SSID;
-    netConfig.wifiPassword = WIFI_PASSWORD;
-    netConfig.mqttBroker = MQTT_BROKER;
-    netConfig.mqttPort = MQTT_PORT;
-    netConfig.mqttUsername = MQTT_USERNAME;
-    netConfig.mqttPassword = MQTT_PASSWORD;
+    static String s_ssid;
+    static String s_pass;
+    static String s_broker;
+    static String s_user;
+    static String s_pass_mqtt;
+
+    s_ssid = get_sta_ssid();
+    s_pass = get_sta_password();
+    s_broker = get_mqtt_broker();
+    s_user = get_mqtt_user();
+    s_pass_mqtt = get_mqtt_pass();
+
+    netConfig.wifiSsid = s_ssid.c_str();
+    netConfig.wifiPassword = s_pass.c_str();
+    netConfig.mqttBroker = s_broker.c_str();
+    netConfig.mqttPort = get_mqtt_port();
+    netConfig.mqttUsername = s_user.c_str();
+    netConfig.mqttPassword = s_pass_mqtt.c_str();
     netConfig.clientIdPrefix = "water_brain_client";
     netConfig.wifiReconnectIntervalMs = 20000;
     netConfig.mqttReconnectIntervalMs = MQTT_RECONNECT_INTERVAL_MS;
@@ -39,8 +52,11 @@ void SmartGateway::begin() {
     _netManager.onStateChange([](NetworkState state) {
         if (state == STATE_MQTT_CONNECTED) {
             if (_instance) {
-                _instance->_netManager.subscribe(MQTT_DURATION_SUB);
-                _instance->_netManager.subscribe(MQTT_PUMP_TIME_SUB);
+                // 动态构建订阅主题
+                String durationSub = "water/" + get_station_name() + "/config/duration/+";
+                String pumpTimeSub = "water/" + get_station_name() + "/config/pump_time/+";
+                _instance->_netManager.subscribe(durationSub.c_str());
+                _instance->_netManager.subscribe(pumpTimeSub.c_str());
                 if (_instance->_sensorSource == SensorSource::MQTT) {
                     _instance->_netManager.subscribe(MQTT_SENSOR_DATA_SUB);
                 }
@@ -86,11 +102,12 @@ void SmartGateway::onConfigPumpTime(ConfigPumpTimeCallback cb) {
 }
 
 void SmartGateway::publishStatus(const char* jsonPayload) {
-    _netManager.publish(MQTT_STATUS_TOPIC, jsonPayload);
+    String topic = "water/" + get_station_name() + "/system/status";
+    _netManager.publish(topic.c_str(), jsonPayload);
 }
 
 void SmartGateway::publishLog(int channelId, const char* logMessage) {
-    String topic = String(MQTT_LOG_PREFIX) + "/" + String(channelId);
+    String topic = "water/" + get_station_name() + "/log/" + String(channelId);
     _netManager.publish(topic.c_str(), logMessage);
 }
 
@@ -110,6 +127,7 @@ void SmartGateway::mqttCallback(char* topic, byte* payload, unsigned int length)
 
 void SmartGateway::handleMqttMessage(char* topic, byte* payload, unsigned int length) {
     String topicStr(topic);
+    String stationName = get_station_name();
 
     if (_sensorSource == SensorSource::MQTT && topicStr == MQTT_SENSOR_DATA_SUB) {
         Serial.print("MQTT RX ");
@@ -117,13 +135,14 @@ void SmartGateway::handleMqttMessage(char* topic, byte* payload, unsigned int le
         DeserializationError error = deserializeJson(doc, payload, length);
         if (!error) {
             const char* name = doc["name"] | "";
-            if (strcmp(name, STATION_NAME) == 0) {
+            if (strcmp(name, stationName.c_str()) == 0) {
                 uint16_t sensor1 = doc["sensor1"] | 0;
                 uint16_t sensor2 = doc["sensor2"] | 0;
                 uint16_t sensor3 = doc["sensor3"] | 0;
                 uint16_t sensor4 = doc["sensor4"] | 0;
+                uint8_t stateByte = doc["state"] | 0;
                 if (_sensorCb) {
-                    _sensorCb(sensor1, sensor2, sensor3, sensor4);
+                    _sensorCb(sensor1, sensor2, sensor3, sensor4, stateByte);
                 }
             }
         } else {
@@ -139,13 +158,16 @@ void SmartGateway::handleMqttMessage(char* topic, byte* payload, unsigned int le
     }
     float value = valStr.toFloat();
 
-    if (topicStr.startsWith(MQTT_DURATION_PREFIX)) {
-        int channelId = topicStr.substring(String(MQTT_DURATION_PREFIX).length()).toInt();
+    String durationPrefix = "water/" + stationName + "/config/duration/";
+    String pumpTimePrefix = "water/" + stationName + "/config/pump_time/";
+
+    if (topicStr.startsWith(durationPrefix)) {
+        int channelId = topicStr.substring(durationPrefix.length()).toInt();
         if (_durationCb) {
             _durationCb(channelId, value);
         }
-    } else if (topicStr.startsWith(MQTT_PUMP_TIME_PREFIX)) {
-        int channelId = topicStr.substring(String(MQTT_PUMP_TIME_PREFIX).length()).toInt();
+    } else if (topicStr.startsWith(pumpTimePrefix)) {
+        int channelId = topicStr.substring(pumpTimePrefix.length()).toInt();
         if (_pumpTimeCb) {
             _pumpTimeCb(channelId, value);
         }
@@ -165,26 +187,27 @@ void SmartGateway::AdvertisedDeviceCallbacks::onResult(BLEAdvertisedDevice adver
     if (advertisedDevice.getName() == TARGET_BLE_NAME) {
         if (advertisedDevice.haveManufacturerData()) {
             std::string data = advertisedDevice.getManufacturerData();
-            if (data.length() == 11) {
+            if (data.length() == 11 || data.length() == 12) {
                 uint8_t cIdLsb = (uint8_t)data[0];
                 uint8_t cIdMsb = (uint8_t)data[1];
                 uint16_t cId = (cIdMsb << 8) | cIdLsb;
                 if (cId == BLE_COMPANY_ID_VAL) {
-                    uint8_t seqNum = (uint8_t)data[10];
+                    uint8_t seqNum = (data.length() == 12) ? (uint8_t)data[11] : (uint8_t)data[10];
                     if (seqNum != _instance->_lastSeqNum) {
                         _instance->_lastSeqNum = seqNum;
                         _instance->_bleConnected = true;
                         _instance->_lastBlePacketTime = millis();
 
-                        Serial.printf("[GATEWAY BLE] 接收到唯一广播包, seqNum=%u\n", seqNum);
-
                         uint16_t sensor1 = ((uint8_t)data[2] << 8) | (uint8_t)data[3];
                         uint16_t sensor2 = ((uint8_t)data[4] << 8) | (uint8_t)data[5];
                         uint16_t sensor3 = ((uint8_t)data[6] << 8) | (uint8_t)data[7];
                         uint16_t sensor4 = ((uint8_t)data[8] << 8) | (uint8_t)data[9];
+                        uint8_t stateByte = (data.length() == 12) ? (uint8_t)data[10] : 0;
+
+                        Serial.printf("[GATEWAY BLE] 接收到唯一广播包, seqNum=%u, stateByte=0x%02X\n", seqNum, stateByte);
 
                         if (_instance->_sensorCb) {
-                            _instance->_sensorCb(sensor1, sensor2, sensor3, sensor4);
+                            _instance->_sensorCb(sensor1, sensor2, sensor3, sensor4, stateByte);
                         }
                     }
                 }
