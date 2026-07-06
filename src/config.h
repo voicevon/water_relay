@@ -73,7 +73,7 @@
 #define FACTORY_MQTT_PASSWORD   "" // 视环境决定
 
 // 站点名称定义（作为过滤依据）
-#define FACTORY_STATION_NAME         "dongzhan"
+#define FACTORY_DEVICE_NAME         "home"
 // 订阅传感器数据的主题（以 water_Android 为准）
 #define MQTT_SENSOR_DATA_SUB "water/sensor/status"
 

@@ -481,7 +481,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             <div class="card" style="padding: 1rem 1.5rem; margin-bottom: 1.25rem;">
                 <div class="info-bar">
                     <div>
-                        站点名称: <span id="info-station" style="font-weight: 600; color: var(--accent-cyan); margin-right: 1.5rem;">dongzhan</span>
+                        站点名称: <span id="info-station" style="font-weight: 600; color: var(--accent-cyan); margin-right: 1.5rem;">home</span>
                         STA SSID: <span id="info-ssid" style="font-weight: 600; color: var(--accent-blue);">未连接</span>
                         <span id="info-ip" style="font-size: 0.85rem; color: var(--text-muted); margin-left: 0.5rem;"></span>
                     </div>
@@ -545,7 +545,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
                     <div class="form-group">
                         <label for="name">设备站点标识 (STATION_NAME)</label>
-                        <input type="text" id="name" name="name" placeholder="例如: dongzhan" required>
+                        <input type="text" id="name" name="name" placeholder="例如: home" required>
                     </div>
                     <div class="form-group">
                         <label for="broker">MQTT Broker 地址 (域名或 IP)</label>
@@ -617,7 +617,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
                 const data = await res.json();
                 document.getElementById('ssid').value = data.ssid || '';
                 document.getElementById('password').value = data.pass || '';
-                document.getElementById('name').value = data.name || 'dongzhan';
+                document.getElementById('name').value = data.name || 'home';
                 document.getElementById('broker').value = data.broker || 'voicevon.vicp.io';
                 document.getElementById('port').value = data.port || 1883;
                 document.getElementById('user').value = data.user || '';
@@ -724,7 +724,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
                 // 1. 更新顶部连接信息与信号强度
                 document.getElementById('info-ssid').textContent = data.ssid || "未连接";
-                document.getElementById('info-station').textContent = data.station || "dongzhan";
+                document.getElementById('info-station').textContent = data.station || "home";
                 if (data.ip) {
                     document.getElementById('info-ip').textContent = `(IP: ${data.ip})`;
                 } else {
@@ -962,7 +962,7 @@ void web_config_init() {
     // 从 NVS 读取参数，没有则使用 config.h 定义的缺省宏值
     s_sta_ssid = s_prefs.getString("sta_ssid", FACTORY_WIFI_SSID);
     s_sta_password = s_prefs.getString("sta_pass", FACTORY_WIFI_PASSWORD);
-    s_sta_name = s_prefs.getString("sta_name", FACTORY_STATION_NAME);
+    s_sta_name = s_prefs.getString("sta_name", FACTORY_DEVICE_NAME);
     s_mqtt_broker = s_prefs.getString("mqtt_broker", FACTORY_MQTT_BROKER);
     s_mqtt_port = s_prefs.getInt("mqtt_port", FACTORY_MQTT_PORT);
     s_mqtt_user = s_prefs.getString("mqtt_user", FACTORY_MQTT_USERNAME);
