@@ -27,7 +27,7 @@
 #define LED_PIN_STAGE_6  23
 #define LED_PIN_STAGE_7  32
 #define LED_PIN_STAGE_8  33
-#define LED_PIN_STAGE_9  33
+#define LED_PIN_STAGE_9  5
 
 // 系统运行状态指示灯 (板载 LED)
 #define STATUS_LED_PIN   2

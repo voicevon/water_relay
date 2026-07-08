@@ -7,6 +7,16 @@
 // ============================================================
 static Preferences s_prefs;
 
+// NVS 命名空间与键名常量，集中管理避免拼写错误
+static const char NVS_NAMESPACE[]     = "sensor_map";
+static const char NVS_KEY_SSID[]      = "sta_ssid";
+static const char NVS_KEY_PASS[]      = "sta_pass";
+static const char NVS_KEY_NAME[]      = "sta_name";
+static const char NVS_KEY_BROKER[]    = "mqtt_broker";
+static const char NVS_KEY_PORT[]      = "mqtt_port";
+static const char NVS_KEY_MQTT_USER[] = "mqtt_user";
+static const char NVS_KEY_MQTT_PASS[] = "mqtt_pass";
+
 // ============================================================
 //  配置项内存缓存（内部私有）
 // ============================================================
@@ -22,15 +32,15 @@ static String s_mqtt_pass    = "";
 //  NVS 初始化
 // ============================================================
 void nvs_config_init() {
-    s_prefs.begin("sensor_map", false);
+    s_prefs.begin(NVS_NAMESPACE, false);
 
-    s_sta_ssid     = s_prefs.getString("sta_ssid",    FACTORY_WIFI_SSID);
-    s_sta_password = s_prefs.getString("sta_pass",    FACTORY_WIFI_PASSWORD);
-    s_sta_name     = s_prefs.getString("sta_name",    FACTORY_DEVICE_NAME);
-    s_mqtt_broker  = s_prefs.getString("mqtt_broker", FACTORY_MQTT_BROKER);
-    s_mqtt_port    = s_prefs.getInt("mqtt_port",      FACTORY_MQTT_PORT);
-    s_mqtt_user    = s_prefs.getString("mqtt_user",   FACTORY_MQTT_USERNAME);
-    s_mqtt_pass    = s_prefs.getString("mqtt_pass",   FACTORY_MQTT_PASSWORD);
+    s_sta_ssid     = s_prefs.getString(NVS_KEY_SSID,      FACTORY_WIFI_SSID);
+    s_sta_password = s_prefs.getString(NVS_KEY_PASS,      FACTORY_WIFI_PASSWORD);
+    s_sta_name     = s_prefs.getString(NVS_KEY_NAME,      FACTORY_DEVICE_NAME);
+    s_mqtt_broker  = s_prefs.getString(NVS_KEY_BROKER,    FACTORY_MQTT_BROKER);
+    s_mqtt_port    = s_prefs.getInt(NVS_KEY_PORT,         FACTORY_MQTT_PORT);
+    s_mqtt_user    = s_prefs.getString(NVS_KEY_MQTT_USER, FACTORY_MQTT_USERNAME);
+    s_mqtt_pass    = s_prefs.getString(NVS_KEY_MQTT_PASS, FACTORY_MQTT_PASSWORD);
 
     Serial.printf("[NvsConfig] Loaded WiFi STA SSID: %s\n", s_sta_ssid.c_str());
     Serial.printf("[NvsConfig] Station Name: %s, MQTT Broker: %s:%d\n",
@@ -54,48 +64,48 @@ String get_mqtt_pass()     { return s_mqtt_pass; }
 bool nvs_set_sta_ssid(const String& val) {
     if (val.length() == 0 || val == s_sta_ssid) return false;
     s_sta_ssid = val;
-    s_prefs.putString("sta_ssid", val);
+    s_prefs.putString(NVS_KEY_SSID, val);
     return true;
 }
 
 bool nvs_set_sta_password(const String& val) {
     if (val == s_sta_password) return false;
     s_sta_password = val;
-    s_prefs.putString("sta_pass", val);
+    s_prefs.putString(NVS_KEY_PASS, val);
     return true;
 }
 
 bool nvs_set_station_name(const String& val) {
     if (val.length() == 0 || val == s_sta_name) return false;
     s_sta_name = val;
-    s_prefs.putString("sta_name", val);
+    s_prefs.putString(NVS_KEY_NAME, val);
     return true;
 }
 
 bool nvs_set_mqtt_broker(const String& val) {
     if (val.length() == 0 || val == s_mqtt_broker) return false;
     s_mqtt_broker = val;
-    s_prefs.putString("mqtt_broker", val);
+    s_prefs.putString(NVS_KEY_BROKER, val);
     return true;
 }
 
 bool nvs_set_mqtt_port(int val) {
     if (val <= 0 || val == s_mqtt_port) return false;
     s_mqtt_port = val;
-    s_prefs.putInt("mqtt_port", val);
+    s_prefs.putInt(NVS_KEY_PORT, val);
     return true;
 }
 
 bool nvs_set_mqtt_user(const String& val) {
     if (val == s_mqtt_user) return false;
     s_mqtt_user = val;
-    s_prefs.putString("mqtt_user", val);
+    s_prefs.putString(NVS_KEY_MQTT_USER, val);
     return true;
 }
 
 bool nvs_set_mqtt_pass(const String& val) {
     if (val == s_mqtt_pass) return false;
     s_mqtt_pass = val;
-    s_prefs.putString("mqtt_pass", val);
+    s_prefs.putString(NVS_KEY_MQTT_PASS, val);
     return true;
 }

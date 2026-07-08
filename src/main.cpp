@@ -20,9 +20,12 @@ const int STAGE_LED_PINS[10] = {
 //  全局对象与变量定义
 // ============================================================================
 
-// 4通道传感器输入数据及有无水状态缓存 (数据计算已移至 sensor 节点)
-uint16_t g_sensor_values[4] = {0, 0, 0, 0};
-bool g_sensor_states[4] = {false, false, false, false};
+// 3通道传感器输入数据及有无水状态缓存 (数据计算已移至 sensor 节点)
+uint16_t g_sensor_values[3] = {0, 0, 0};
+bool g_sensor_states[3] = {false, false, false};
+
+// 3路水泵通道对应的传感器物理通道映射关系
+static const int SENSOR_MAP[3] = { SENSOR_MAP_PUMP_0, SENSOR_MAP_PUMP_1, SENSOR_MAP_PUMP_2 };
 
 // 3通道本地继电器与指示灯物理状态机
 SamplingController channels[3] = {
@@ -42,31 +45,28 @@ int lastStages[3] = {-1, -1, -1};
 // ============================================================================
 
 // 1. 接收到网关传感器数据 (含节点端判定好的状态位)
-void handleSensorData(uint16_t sensor1, uint16_t sensor2, uint16_t sensor3, uint16_t sensor4, uint8_t stateByte) {
+void handleSensorData(uint16_t sensor1, uint16_t sensor2, uint16_t sensor3, uint8_t stateByte) {
     g_sensor_values[0] = sensor1;
     g_sensor_values[1] = sensor2;
     g_sensor_values[2] = sensor3;
-    g_sensor_values[3] = sensor4;
 
     bool prevStates[3];
     for (int i = 0; i < 3; i++) {
-        int sensorCh = (i == 0) ? SENSOR_MAP_PUMP_0 : ((i == 1) ? SENSOR_MAP_PUMP_1 : SENSOR_MAP_PUMP_2);
-        prevStates[i] = g_sensor_states[sensorCh];
+        prevStates[i] = g_sensor_states[i];
     }
 
     g_sensor_states[0] = (stateByte & 0x01) != 0;
     g_sensor_states[1] = (stateByte & 0x02) != 0;
     g_sensor_states[2] = (stateByte & 0x04) != 0;
-    g_sensor_states[3] = (stateByte & 0x08) != 0;
 
-    Serial.printf("[APP GATEWAY] RX: #1=%u #2=%u #3=%u #4=%u, States: #1=%d #2=%d #3=%d #4=%d\n",
-                  sensor1, sensor2, sensor3, sensor4,
-                  g_sensor_states[0], g_sensor_states[1], g_sensor_states[2], g_sensor_states[3]);
+    Serial.printf("[APP GATEWAY] RX: #1=%u #2=%u #3=%u, States: #1=%d #2=%d #3=%d\n",
+                  sensor1, sensor2, sensor3,
+                  g_sensor_states[0], g_sensor_states[1], g_sensor_states[2]);
 
     // 检测有无水状态变化以发布 MQTT 日志
     for (int i = 0; i < 3; i++) {
-        int sensorCh = (i == 0) ? SENSOR_MAP_PUMP_0 : ((i == 1) ? SENSOR_MAP_PUMP_1 : SENSOR_MAP_PUMP_2);
-        if (g_sensor_states[sensorCh] != prevStates[i]) {
+        int sensorCh = SENSOR_MAP[i];
+        if (g_sensor_states[sensorCh] != prevStates[sensorCh]) {
             char logMsg[64];
             snprintf(logMsg, sizeof(logMsg), "通道%d 传感器检测到%s", i, g_sensor_states[sensorCh] ? "有水" : "无水");
             gateway.publishLog(channels[i].id, logMsg);
@@ -117,12 +117,6 @@ void publishStatus() {
             chObj["pump_on"] = channels[i].lastPumpState;
             chObj["on_count"] = channels[i].onCount;
             chObj["detected"] = channels[i].isDetected;
-            
-            // 获取对应的传感器物理通道索引并填充值
-            int sensorCh = (i == 0) ? SENSOR_MAP_PUMP_0 : ((i == 1) ? SENSOR_MAP_PUMP_1 : SENSOR_MAP_PUMP_2);
-            chObj["raw"] = g_sensor_values[sensorCh]; 
-            chObj["filtered"] = g_sensor_values[sensorCh];
-            chObj["baseline"] = g_sensor_values[sensorCh];
         }
         
         String jsonPayload;
@@ -164,7 +158,22 @@ void setup() {
     // 启动网关网络通信
     pinMode(STATUS_LED_PIN, OUTPUT);
     digitalWrite(STATUS_LED_PIN, LOW); // 默认关闭状态指示灯
-    gateway.begin();
+
+    SmartGatewayConfig config;
+    config.wifiSsid = get_sta_ssid();
+    config.wifiPassword = get_sta_password();
+    config.mqttBroker = get_mqtt_broker();
+    config.mqttPort = get_mqtt_port();
+    config.mqttUsername = get_mqtt_user();
+    config.mqttPassword = get_mqtt_pass();
+    config.stationName = get_station_name();
+    config.targetBleName = TARGET_BLE_NAME;
+    config.bleCompanyIdVal = BLE_COMPANY_ID_VAL;
+    config.bleScanDurationS = BLE_SCAN_DURATION_S;
+    config.mqttSensorDataSub = MQTT_SENSOR_DATA_SUB;
+    config.mqttReconnectIntervalMs = MQTT_RECONNECT_INTERVAL_MS;
+
+    gateway.begin(config);
 }
 
 void loop() {
@@ -236,12 +245,12 @@ void loop() {
     }
 
     // 5. 更新 Web 监控缓存数据
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 3; i++) {
         // 由于 Sensor 类已被删除，我们将滤波/基准值/阈值全部简化为 0，仅保留 Raw 电容值及开关水状态
         web_config_update_sensor(i, g_sensor_values[i], 0, 0, 0, g_sensor_states[i]);
     }
     for (int i = 0; i < 3; i++) {
-        int sensorCh = (i == 0) ? SENSOR_MAP_PUMP_0 : ((i == 1) ? SENSOR_MAP_PUMP_1 : SENSOR_MAP_PUMP_2);
+        int sensorCh = SENSOR_MAP[i];
         web_config_update_relay(i, channels[i].active, channels[i].currentStage, channels[i].lastPumpState, channels[i].onCount, g_sensor_states[sensorCh]);
     }
 

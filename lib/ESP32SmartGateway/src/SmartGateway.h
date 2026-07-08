@@ -14,17 +14,38 @@ enum class SensorSource {
     MQTT
 };
 
+// 智能网关配置结构体，解耦应用层与库文件
+struct SmartGatewayConfig {
+    // WiFi 与 MQTT 连接配置
+    String wifiSsid;
+    String wifiPassword;
+    String mqttBroker;
+    uint16_t mqttPort = 1883;
+    String mqttUsername;
+    String mqttPassword;
+    String stationName; // 站点名称，用于动态主题拼接
+
+    // BLE 扫描参数
+    String targetBleName = "FengBLE";
+    uint16_t bleCompanyIdVal = 0xFFFF;
+    uint32_t bleScanDurationS = 5;
+
+    // MQTT 协议参数
+    String mqttSensorDataSub = "water/sensor/status";
+    uint32_t mqttReconnectIntervalMs = 5000;
+};
+
 class SmartGateway {
 public:
     // 事件回调函数指针定义
-    typedef void (*SensorDataCallback)(uint16_t sensor1, uint16_t sensor2, uint16_t sensor3, uint16_t sensor4, uint8_t stateByte);
+    typedef void (*SensorDataCallback)(uint16_t sensor1, uint16_t sensor2, uint16_t sensor3, uint8_t stateByte);
     typedef void (*ConfigDurationCallback)(int channelId, float durationMinutes);
     typedef void (*ConfigPumpTimeCallback)(int channelId, float pumpTimeSeconds);
 
     SmartGateway(SensorSource source = SensorSource::BLE);
 
     // 初始化网关（WiFi, MQTT, BLE）
-    void begin();
+    void begin(const SmartGatewayConfig& config);
     
     // 心跳维护函数，需在主循环中非阻塞调用
     void loop();
@@ -58,6 +79,12 @@ private:
     WiFiClient _espClient;
     ESP32WifiMqttManager _netManager;
     BLEScan* _pBLEScan = nullptr;
+
+    String _stationName;
+    String _mqttSensorDataSub;
+    String _targetBleName;
+    uint16_t _bleCompanyIdVal = 0xFFFF;
+    uint32_t _bleScanDurationS = 5;
 
     uint8_t _lastSeqNum = -1;
     bool _bleConnected = false;

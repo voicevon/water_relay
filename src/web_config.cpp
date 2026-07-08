@@ -42,15 +42,15 @@ static void handle_get_data() {
     json += "\"ip\":\""      + (WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : String("")) + "\",";
     json += "\"rssi\":"      + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0) + ",";
 
-    // 4路传感器输入状态
+    // 3路传感器输入状态
     json += "\"sensors\":[";
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 3; i++) {
         const SensorCache& s = data_cache_get_sensor(i);
         json += "{";
         json += "\"raw\":"      + String(s.raw_val) + ",";
         json += "\"detected\":" + String(s.detected ? "true" : "false");
         json += "}";
-        if (i < 3) json += ",";
+        if (i < 2) json += ",";
     }
     json += "],";
 

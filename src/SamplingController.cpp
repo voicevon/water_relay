@@ -19,55 +19,62 @@ bool SamplingController::update(bool detected) {
     uint32_t nowSec = millis() / 1000;
     uint32_t elapsed = nowSec - stageStartTime;
 
+    bool hasTransitioned = false;
+
     // 1. 水流消失时的异常跳转保护
     if (!detected) {
         if (currentStage == 1) {
             // 待稳期水流消失，直接退回 Stage 0
             transitionTo(0, nowSec);
+            hasTransitioned = true;
         } 
         else if (currentStage >= 2 && currentStage <= 7) {
             // 已开始采样但中途水流消失，强行跳转到 Stage 8 进行管道排空
             transitionTo(8, nowSec);
+            hasTransitioned = true;
         }
         else if (currentStage == 9) {
             // 结束后传感器变干，复位回到 Stage 0
             transitionTo(0, nowSec);
+            hasTransitioned = true;
         }
         // Stage 8 必须跑满排空时间，不在此处进行干预
     }
 
     // 2. 正常时间与信号触发状态机
-    switch (currentStage) {
-        case 0:
-            if (detected) transitionTo(1, nowSec);
-            break;
-        case 1:
-            if (elapsed >= STABILIZATION_TIME_SEC) transitionTo(2, nowSec);
-            break;
-        case 2:
-            if (elapsed >= pumpWorkTime) transitionTo(3, nowSec);
-            break;
-        case 3:
-            if (elapsed >= restTime) transitionTo(4, nowSec);
-            break;
-        case 4:
-            if (elapsed >= pumpWorkTime) transitionTo(5, nowSec);
-            break;
-        case 5:
-            if (elapsed >= restTime) transitionTo(6, nowSec);
-            break;
-        case 6:
-            if (elapsed >= pumpWorkTime) transitionTo(7, nowSec);
-            break;
-        case 7:
-            if (elapsed >= SIGNAL_LOST_TIME_SEC) transitionTo(8, nowSec);
-            break;
-        case 8:
-            if (elapsed >= pumpWorkTime) transitionTo(9, nowSec);
-            break;
-        case 9:
-            // 等待 !detected 触发复位
-            break;
+    if (!hasTransitioned) {
+        switch (currentStage) {
+            case 0:
+                if (detected) transitionTo(1, nowSec);
+                break;
+            case 1:
+                if (elapsed >= STABILIZATION_TIME_SEC) transitionTo(2, nowSec);
+                break;
+            case 2:
+                if (elapsed >= pumpWorkTime) transitionTo(3, nowSec);
+                break;
+            case 3:
+                if (elapsed >= restTime) transitionTo(4, nowSec);
+                break;
+            case 4:
+                if (elapsed >= pumpWorkTime) transitionTo(5, nowSec);
+                break;
+            case 5:
+                if (elapsed >= restTime) transitionTo(6, nowSec);
+                break;
+            case 6:
+                if (elapsed >= pumpWorkTime) transitionTo(7, nowSec);
+                break;
+            case 7:
+                if (elapsed >= SIGNAL_LOST_TIME_SEC) transitionTo(8, nowSec);
+                break;
+            case 8:
+                if (elapsed >= pumpWorkTime) transitionTo(9, nowSec);
+                break;
+            case 9:
+                // 等待 !detected 触发复位
+                break;
+        }
     }
 
     // 确认水泵开启状态 (Stage 2, 4, 6, 8 开启)
