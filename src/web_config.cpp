@@ -33,6 +33,10 @@ static void print_wifi_status(const char* label) {
 //  REST API 处理函数
 // ============================================================
 
+#include <SmartGateway.h>
+
+extern SmartGateway gateway;
+
 // GET /api/data — 返回实时网关状态及传感器/继电器数据
 static void handle_get_data() {
     String json = "{";
@@ -41,6 +45,9 @@ static void handle_get_data() {
     json += "\"ssid\":\""    + (WiFi.status() == WL_CONNECTED ? WiFi.SSID() : String("")) + "\",";
     json += "\"ip\":\""      + (WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString() : String("")) + "\",";
     json += "\"rssi\":"      + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0) + ",";
+    json += "\"wifi_connected\":" + String((WiFi.status() == WL_CONNECTED) ? "true" : "false") + ",";
+    json += "\"mqtt_connected\":" + String((gateway.getNetworkState() == STATE_MQTT_CONNECTED) ? "true" : "false") + ",";
+
 
     // 3路传感器输入状态
     json += "\"sensors\":[";

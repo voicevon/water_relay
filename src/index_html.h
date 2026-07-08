@@ -1,9 +1,4 @@
-﻿#pragma once
-/*
-注意：water_relay/src/index_html.h 
-第 12 行的中文标题存在乱码（原始 web_config.cpp 的 GBK/GB2312 编码被 git 以 UTF-8 读出后转码损坏），
-这是视觉上的小问题，不影响功能和编译。若需修复可手动将 <title> 内容改为正确的 水泵网关监控与配置中心。
-*/
+#pragma once
 #include <Arduino.h>
 
 // 水泵网关监控暗色 SPA 前端 HTML（存储于 Flash PROGMEM，不占用 RAM）
@@ -13,7 +8,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>姘存车缃戝叧鐩戞帶涓庨厤缃腑蹇?/title>
+    <title>水泵控制节点</title>
     <style>
         :root {
             --bg-color: #0b0f19;
@@ -46,7 +41,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             align-items: center;
         }
 
-        /* 椤堕儴瀵艰埅鏍?*/
+        /* 顶部导航栏 */
         header {
             width: 100%;
             background: var(--nav-bg);
@@ -90,7 +85,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             background: rgba(255, 255, 255, 0.05);
         }
 
-        /* 渚ц竟鑿滃崟 */
+        /* 侧边菜单 */
         .drawer {
             position: fixed;
             top: 0;
@@ -111,19 +106,6 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
         .drawer.open {
             transform: translateX(0);
-        }
-
-        .drawer-close {
-            align-self: flex-end;
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            font-size: 1.5rem;
-            cursor: pointer;
-        }
-
-        .drawer-close:hover {
-            color: var(--text-main);
         }
 
         .nav-link {
@@ -156,7 +138,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             display: block;
         }
 
-        /* 涓诲鍣?*/
+        /* 主容器 */
         .container {
             width: 100%;
             max-width: 900px;
@@ -166,7 +148,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             gap: 1.5rem;
         }
 
-        /* TAB 鍒囨崲 */
+        /* TAB 切换 */
         .tab-content {
             display: none;
         }
@@ -208,7 +190,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             gap: 1rem;
         }
 
-        /* 鍗＄墖鍐呭瓙椤?*/
+        /* 卡片内子项 */
         .status-item {
             background: rgba(10, 15, 28, 0.6);
             border: 1px solid var(--border-color);
@@ -286,7 +268,25 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             font-weight: 500;
         }
 
-        /* 淇″彿寮哄害鏍?*/
+        /* WiFi/MQTT 状态徽章 */
+        .status-badge {
+            font-size: 0.72rem;
+            padding: 0.15rem 0.45rem;
+            border-radius: 9999px;
+            font-weight: 700;
+        }
+
+        .status-badge.dry {
+            background: rgba(100, 116, 139, 0.15);
+            color: var(--dry-normal);
+        }
+
+        .status-badge.water {
+            background: rgba(6, 182, 212, 0.15);
+            color: var(--water-alert);
+        }
+
+        /* 信号强度条 */
         .info-bar {
             display: flex;
             justify-content: space-between;
@@ -320,7 +320,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             background-color: var(--accent-green);
         }
 
-        /* 琛ㄥ崟 */
+        /* 表单 */
         .form-group {
             display: flex;
             flex-direction: column;
@@ -429,33 +429,32 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
 <body>
 
     <header>
-        <div class="logo">姘存车鎺у埗缃戝叧鐩戣涓績</div>
-        <button class="menu-btn" onclick="toggleDrawer(true)">鈽?/button>
+        <div class="logo">水泵控制节点</div>
+        <button class="menu-btn" onclick="toggleDrawer(true)">☰</button>
     </header>
 
-    <!-- 渚ц竟鑿滃崟 -->
+    <!-- 侧边菜单 -->
     <div class="overlay" id="overlay" onclick="toggleDrawer(false)"></div>
     <div class="drawer" id="drawer">
-        <button class="drawer-close" onclick="toggleDrawer(false)">鉁?/button>
         <div style="height: 1rem;"></div>
-        <div class="nav-link active" data-tab="tab-monitor" onclick="switchTab(this)">瀹炴椂杩愯鐩戞帶</div>
-        <div class="nav-link" data-tab="tab-wifi" onclick="switchTab(this)">缃戠粶涓庣郴缁熼厤缃?/div>
-        <div class="nav-link" data-tab="tab-about" onclick="switchTab(this)">鍏充簬璁惧</div>
+        <div class="nav-link active" data-tab="tab-monitor" onclick="switchTab(this)">实时运行监控</div>
+        <div class="nav-link" data-tab="tab-wifi" onclick="switchTab(this)">网络与系统配置</div>
+        <div class="nav-link" data-tab="tab-about" onclick="switchTab(this)">关于</div>
     </div>
 
     <div class="container">
-        <!-- 瀹炴椂鐩戞帶 TAB -->
+        <!-- 实时监控 TAB -->
         <div id="tab-monitor" class="tab-content active">
-            <!-- 淇″彿寮哄害涓庤繛鎺ヤ俊鎭?-->
+            <!-- 信号强度与连接信息 -->
             <div class="card" style="padding: 1rem 1.5rem; margin-bottom: 1.25rem;">
                 <div class="info-bar">
                     <div>
-                        绔欑偣鍚嶇О: <span id="info-station" style="font-weight: 600; color: var(--accent-cyan); margin-right: 1.5rem;">home</span>
-                        STA SSID: <span id="info-ssid" style="font-weight: 600; color: var(--accent-blue);">鏈繛鎺?/span>
-                        <span id="info-ip" style="font-size: 0.85rem; color: var(--text-muted); margin-left: 0.5rem;"></span>
+                        站点名称: <span id="info-station" style="font-weight: 600; color: var(--accent-cyan);">home</span><br>
+                        STA SSID: <span id="info-ssid" style="font-weight: 600; color: var(--accent-blue);">未连接</span><br>
+                        IP 地址: <span id="info-ip" style="font-weight: 600; color: var(--text-main);"></span>
                     </div>
                     <div class="signal-indicator">
-                        <span>淇″彿寮哄害:</span>
+                        <span>信号强度:</span>
                         <span id="signal-dbm" style="font-weight: 500;">-- dBm</span>
                         <div class="signal-bar" id="signal-bars">
                             <span id="sbar1"></span>
@@ -467,103 +466,114 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
                 </div>
             </div>
 
-            <!-- 缁х數鍣?姘存车閫氶亾鍒楄〃 -->
+            <!-- 继电器/水泵通道列表 -->
             <div class="card">
                 <div class="card-title">
-                    <span>3 姘存车閫氶亾鎺у埗鐘舵€?/span>
-                    <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">鐘舵€佹満椹卞姩 (10姝ユ硶)</span>
+                    <span>3 水泵通道控制状态</span>
+                    <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">状态机驱动 (10步法)</span>
                 </div>
                 <div class="grid-3" id="relay-grid">
-                    <!-- JS 鍔ㄦ€佹覆鏌?-->
+                    <!-- JS 动态渲染 -->
                 </div>
             </div>
 
-            <!-- 浼犳劅鍣ㄧ墿鐞嗛€氶亾鍒楄〃 -->
+            <!-- 传感器物理通道列表 -->
             <div class="card">
                 <div class="card-title">
-                    <span>4 閫氶亾杈撳叆浼犳劅鍣ㄥ€?/span>
-                    <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">鑷姩鏇存柊(1Hz)</span>
+                    <span>3 通道输入传感器值</span>
+                    <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">自动更新(1Hz)</span>
                 </div>
                 <div class="grid-4" id="sensor-grid">
-                    <!-- JS 鍔ㄦ€佹覆鏌?-->
+                    <!-- JS 动态渲染 -->
                 </div>
             </div>
         </div>
 
-        <!-- 绯荤粺涓庣綉缁滈厤缃?TAB -->
+        <!-- 系统与网络配置 TAB -->
         <div id="tab-wifi" class="tab-content">
+            <!-- WiFi & MQTT 物理状态卡片 -->
+            <div class="card" style="padding: 1rem 1.5rem; margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; align-items: flex-start; font-size: 0.95rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="color: var(--text-muted);">WiFi:</span>
+                    <span id="wifi-status" class="status-badge dry">检测中...</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="color: var(--text-muted);">MQTT:</span>
+                    <span id="mqtt-status" class="status-badge dry">检测中...</span>
+                </div>
+            </div>
+            
             <div class="card">
-                <div class="card-title">鏃犵嚎灞€鍩熺綉杩炴帴 (Wi-Fi STA)</div>
+                <div class="card-title">无线局域网连接 (Wi-Fi STA)</div>
                 <form id="wifi-form" onsubmit="saveWifi(event)">
                     <div class="form-group">
-                        <label for="ssid">Wi-Fi 缃戠粶鍚嶇О (SSID)</label>
+                        <label for="ssid">Wi-Fi 网络名称 (SSID)</label>
                         <div style="display: flex; gap: 0.5rem;">
-                            <input type="text" id="ssid" name="ssid" placeholder="璇疯緭鍏?WiFi SSID" style="flex: 1;" required>
-                            <button type="button" class="btn" style="width: auto; padding: 0.5rem 1rem; font-size: 0.85rem;" onclick="scanWifi(this)">鎵弿</button>
+                            <input type="text" id="ssid" name="ssid" placeholder="请输入 WiFi SSID" style="flex: 1;" required>
+                            <button type="button" class="btn" style="width: auto; padding: 0.5rem 1rem; font-size: 0.85rem;" onclick="scanWifi(this)">扫描</button>
                         </div>
                         <div id="wifi-list" class="wifi-list"></div>
                     </div>
                     <div class="form-group">
-                        <label for="password">Wi-Fi 瀵嗙爜 (Password)</label>
-                        <input type="password" id="password" name="password" placeholder="璇疯緭鍏ュ瘑鐮?>
+                        <label for="password">Wi-Fi 密码 (Password)</label>
+                        <input type="password" id="password" name="password" placeholder="请输入密码">
                     </div>
 
                     <div style="margin: 1.5rem 0 1rem 0; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-                        <h4 style="font-size: 1rem; font-weight: 600; color: var(--accent-blue); margin-bottom: 0.75rem;">缃戝叧涓?MQTT 閰嶇疆</h4>
+                        <h4 style="font-size: 1rem; font-weight: 600; color: var(--accent-blue); margin-bottom: 0.75rem;">网关与 MQTT 配置</h4>
                     </div>
 
                     <div class="form-group">
-                        <label for="name">璁惧绔欑偣鏍囪瘑 (STATION_NAME)</label>
-                        <input type="text" id="name" name="name" placeholder="渚嬪: home" required>
+                        <label for="name">设备站点标识 (STATION_NAME)</label>
+                        <input type="text" id="name" name="name" placeholder="例如: home" required>
                     </div>
                     <div class="form-group">
-                        <label for="broker">MQTT Broker 鍦板潃 (鍩熷悕鎴?IP)</label>
-                        <input type="text" id="broker" name="broker" placeholder="渚嬪: voicevon.vicp.io" required>
+                        <label for="broker">MQTT Broker 地址 (域名或 IP)</label>
+                        <input type="text" id="broker" name="broker" placeholder="例如: voicevon.vicp.io" required>
                     </div>
                     <div class="form-group">
-                        <label for="port">MQTT 绔彛 (Port)</label>
-                        <input type="number" id="port" name="port" min="1" max="65535" placeholder="榛樿: 1883" required>
+                        <label for="port">MQTT 端口 (Port)</label>
+                        <input type="number" id="port" name="port" min="1" max="65535" placeholder="默认: 1883" required>
                     </div>
                     <div class="form-group">
-                        <label for="user">MQTT 鐢ㄦ埛鍚?(Username)</label>
-                        <input type="text" id="user" name="user" placeholder="鍙€夛紝鏃犲垯鐣欑┖">
+                        <label for="user">MQTT 用户名 (Username)</label>
+                        <input type="text" id="user" name="user" placeholder="可选，无则留空">
                     </div>
                     <div class="form-group">
-                        <label for="pass_mqtt">MQTT 瀵嗙爜 (Password)</label>
-                        <input type="password" id="pass_mqtt" name="pass_mqtt" placeholder="鍙€夛紝鏃犲垯鐣欑┖">
+                        <label for="pass_mqtt">MQTT 密码 (Password)</label>
+                        <input type="password" id="pass_mqtt" name="pass_mqtt" placeholder="可选，无则留空">
                     </div>
 
-                    <button type="submit" class="btn" style="width: 100%;">淇濆瓨骞跺簲鐢ㄩ厤缃?/button>
+                    <button type="submit" class="btn" style="width: 100%;">保存并应用配置</button>
                 </form>
             </div>
         </div>
 
-        <!-- 鍏充簬璁惧 TAB -->
+        <!-- 关于 TAB -->
         <div id="tab-about" class="tab-content">
             <div class="card">
-                <div class="card-title">璁惧鍏充簬</div>
+                <div class="card-title">关于</div>
                 <div style="line-height: 2; font-size: 0.95rem;">
-                    <p>璁惧鍚嶇О锛?span style="color: var(--accent-blue);">water_brain</span></p>
-                    <p>宸ヤ綔妯″紡锛歋mart Gateway (MQTT / BLE)</p>
-                    <p>鍥轰欢鐗堟湰锛歏2.1</p>
-                    <p>杞‖浠惰璁★細灞变笢鍗风Н鍒嗗叕鍙?/p>
+                    <p>固件版本：V2.1</p>
+                    <p>软硬件设计：山东卷积分公司</p>
                     <p style="margin-top: 1.5rem; color: var(--text-muted); font-size: 0.85rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; text-align: center;">
-                        鐗堟潈鎵€鏈?漏 灞变笢鍗风Н鍒嗗叕鍙?                    </p>
+                        版权所有 © 山东卷积分公司
+                    </p>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="toast">淇濆瓨鎴愬姛锛屽凡搴旂敤骞朵簬鍚庡彴閲嶈繛锛?/div>
+    <div id="toast">保存成功，已应用并于后台重连！</div>
 
     <script>
-        // 鍒囨崲鎶藉眽鑿滃崟
+        // 切换抽屉菜单
         function toggleDrawer(open) {
             document.getElementById('drawer').classList.toggle('open', open);
             document.getElementById('overlay').classList.toggle('show', open);
         }
 
-        // 鍒?Tab
+        // 切换 Tab
         function switchTab(el) {
             document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
             el.classList.add('active');
@@ -595,7 +605,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             }
         }
 
-        // 淇濆瓨閰嶇疆
+        // 保存配置
         async function saveWifi(e) {
             e.preventDefault();
             const form = document.getElementById('wifi-form');
@@ -605,10 +615,10 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
                 if (res.ok) {
                     showToast();
                 } else {
-                    alert("淇濆瓨閰嶇疆澶辫触锛?);
+                    alert("保存配置失败！");
                 }
             } catch (err) {
-                alert("璇锋眰閿欒锛? + err);
+                alert("请求错误：" + err);
             }
         }
 
@@ -618,13 +628,13 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             setTimeout(() => t.classList.remove('show'), 3000);
         }
 
-        // 鎵弿闄勮繎 WiFi
+        // 扫描附近 WiFi
         async function scanWifi(btn) {
             const orig = btn.textContent;
-            btn.textContent = "鎵弿涓?..";
+            btn.textContent = "扫描中...";
             btn.disabled = true;
             const list = document.getElementById('wifi-list');
-            list.innerHTML = '<div style="padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--text-muted); text-align: center;">鎵弿闄勮繎 WiFi 鐑偣涓?..</div>';
+            list.innerHTML = '<div style="padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--text-muted); text-align: center;">扫描附近 WiFi 热点中...</div>';
             list.classList.add('show');
             
             try {
@@ -646,17 +656,18 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
                         list.appendChild(div);
                     });
                 } else {
-                    list.innerHTML = '<div style="padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--text-muted); text-align: center;">鏈壘鍒板彲鐢ㄧ殑 WiFi 缃戠粶</div>';
+                    list.innerHTML = '<div style="padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--text-muted); text-align: center;">未找到可用的 WiFi 网络</div>';
                 }
             } catch (err) {
-                list.innerHTML = '<div style="padding: 0.75rem 1rem; font-size: 0.85rem; color: #ef4444; text-align: center;">鎵弿澶辫触</div>';
+                list.innerHTML = '<div style="padding: 0.75rem 1rem; font-size: 0.85rem; color: #ef4444; text-align: center;">扫描失败</div>';
             } finally {
                 btn.textContent = orig;
                 btn.disabled = false;
             }
         }
 
-        // 娓叉煋淇″彿鏍?        function updateSignalStrength(rssi) {
+        // 渲染信号条
+        function updateSignalStrength(rssi) {
             const dbmSpan = document.getElementById('signal-dbm');
             const bars = [
                 document.getElementById('sbar1'),
@@ -668,36 +679,52 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             bars.forEach(b => b.classList.remove('active'));
 
             if (rssi === 0 || rssi < -100) {
-                dbmSpan.textContent = "鏃犱俊鍙?;
+                dbmSpan.textContent = "无信号";
                 return;
             }
 
             dbmSpan.textContent = rssi + " dBm";
             
-            bars[0].classList.add('active'); // 鑷冲皯鏈?1 鏍?            if (rssi > -85) bars[1].classList.add('active');
+            bars[0].classList.add('active'); // 至少有 1 格
+            if (rssi > -85) bars[1].classList.add('active');
             if (rssi > -70) bars[2].classList.add('active');
             if (rssi > -55) bars[3].classList.add('active');
         }
 
-        // 鏍稿績杞鏇存柊鍑芥暟
+        // 核心轮询更新函数
         async function updateDashboard() {
-            if (!document.getElementById('tab-monitor').classList.contains('active')) {
-                return;
-            }
             try {
                 const res = await fetch('/api/data');
                 const data = await res.json();
 
-                // 1. 鏇存柊椤堕儴杩炴帴淇℃伅涓庝俊鍙峰己搴?                document.getElementById('info-ssid').textContent = data.ssid || "鏈繛鎺?;
+                // 更新 Wi-Fi 和 MQTT 状态显示
+                const wifiBadge = document.getElementById('wifi-status');
+                const mqttBadge = document.getElementById('mqtt-status');
+                if (wifiBadge) {
+                    wifiBadge.textContent = data.wifi_connected ? '已连接' : '未连接';
+                    wifiBadge.className = data.wifi_connected ? 'status-badge water' : 'status-badge dry';
+                }
+                if (mqttBadge) {
+                    mqttBadge.textContent = data.mqtt_connected ? '已连接' : '未连接';
+                    mqttBadge.className = data.mqtt_connected ? 'status-badge water' : 'status-badge dry';
+                }
+
+                // 1. 更新顶部连接信息与信号强度
+                document.getElementById('info-ssid').textContent = data.ssid || "未连接";
                 document.getElementById('info-station').textContent = data.station || "home";
                 if (data.ip) {
-                    document.getElementById('info-ip').textContent = `(IP: ${data.ip})`;
+                    document.getElementById('info-ip').textContent = data.ip;
                 } else {
-                    document.getElementById('info-ip').textContent = "";
+                    document.getElementById('info-ip').textContent = "未获取";
                 }
                 updateSignalStrength(data.rssi);
 
-                // 2. 鏇存柊 3 涓?Relay/姘存车鎺у埗閫氶亾
+                // 如果当前激活的不是监控页，则直接返回，不渲染下方组件列表
+                if (!document.getElementById('tab-monitor').classList.contains('active')) {
+                    return;
+                }
+
+                // 2. 更新 3 个 Relay/水泵控制通道
                 const relayGrid = document.getElementById('relay-grid');
                 relayGrid.innerHTML = '';
                 data.relays.forEach((r, idx) => {
@@ -705,22 +732,23 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
                     chDiv.className = `status-item ${r.active ? 'active-run' : ''}`;
                     chDiv.innerHTML = `
                         <div class="item-header">
-                            <span class="item-title">姘存车閫氶亾 #${r.id}</span>
+                            <span class="item-title">水泵通道 #${r.id}</span>
                             <div class="badge-list">
-                                <span class="badge ${r.active ? 'green' : 'gray'}">${r.active ? '閲囨牱涓? : '绌洪棽'}</span>
-                                <span class="badge ${r.pump_on ? 'orange' : 'gray'}">${r.pump_on ? '姘存车寮€' : '姘存车鍏?}</span>
+                                <span class="badge ${r.active ? 'green' : 'gray'}">${r.active ? '采样中' : '空闲'}</span>
+                                <span class="badge ${r.pump_on ? 'orange' : 'gray'}">${r.pump_on ? '水泵开' : '水泵关'}</span>
                             </div>
                         </div>
                         <div class="item-meta">
-                            <div>褰撳墠闃舵: <span>Stage ${r.stage}</span></div>
-                            <div>绱寮€鍚? <span>${r.on_count} 娆?/span></div>
-                            <div>鎰熷簲鐘舵€? <span>${r.detected ? '<span style="color: var(--accent-cyan);">鏈夋按</span>' : '鏃犳按'}</span></div>
+                            <div>当前阶段: <span>Stage ${r.stage}</span></div>
+                            <div>累计开启: <span>${r.on_count} 次</span></div>
+                            <div>感应状态: <span>${r.detected ? '<span style="color: var(--accent-cyan);">有水</span>' : '无水'}</span></div>
                         </div>
                     `;
                     relayGrid.appendChild(chDiv);
                 });
 
-                // 3. 鏇存柊 4 涓紶鎰熷櫒杈撳叆鍊?                const sensorGrid = document.getElementById('sensor-grid');
+                // 3. 更新 3 个传感器输入值
+                const sensorGrid = document.getElementById('sensor-grid');
                 sensorGrid.innerHTML = '';
                 data.sensors.forEach((s, idx) => {
                     const isWater = s.detected;
@@ -728,12 +756,12 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
                     chDiv.className = `status-item ${isWater ? 'water-detected' : ''}`;
                     chDiv.innerHTML = `
                         <div class="item-header">
-                            <span class="item-title">浼犳劅鍣?#${idx + 1}</span>
-                            <span class="badge ${isWater ? 'blue' : 'gray'}">${isWater ? '鏈夋按' : '骞茬嚗'}</span>
+                            <span class="item-title">传感器 #${idx + 1}</span>
+                            <span class="badge ${isWater ? 'blue' : 'gray'}">${isWater ? '有水' : '无水'}</span>
                         </div>
                         <div class="item-meta">
-                            <div>娴嬪緱鐢靛鍊? <span>${(s.raw / 100.0).toFixed(2)} pF</span></div>
-                            <div style="margin-top: 4px; color: var(--text-muted);">鐘舵€佸瓧鐩存帴瑙ｇ爜: <span>${isWater ? '瑙﹀彂鏈夋按' : '姝ｅ父骞茬嚗'}</span></div>
+                            <div>测得电容值: <span>${(s.raw / 100.0).toFixed(2)} pF</span></div>
+                            <div style="margin-top: 4px; color: var(--text-muted);">状态字直接解码: <span>${isWater ? '有水' : '无水'}</span></div>
                         </div>
                     `;
                     sensorGrid.appendChild(chDiv);
@@ -744,7 +772,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             }
         }
 
-        // 瀹氭椂杞 (1 绉掑埛鏂?
+        // 定时轮询 (1 秒刷新)
         setInterval(updateDashboard, 1000);
         updateDashboard();
     </script>
