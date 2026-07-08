@@ -32,7 +32,7 @@ SamplingController channels[3] = {
 };
 
 // 智能网关实例
-SmartGateway gateway(SensorSource::MQTT);
+SmartGateway gateway(SensorSource::BLE);
 
 uint32_t lastStatusPublish = 0;
 int lastStages[3] = {-1, -1, -1};

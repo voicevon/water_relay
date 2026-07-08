@@ -7,9 +7,10 @@
 
 // -------- 直接控制 GPIO 引脚配置 --------
 // 3路继电器/水泵引脚
-#define RELAY_PIN_CH0   25
-#define RELAY_PIN_CH1   26
-#define RELAY_PIN_CH2   27
+#define RELAY_PIN_CH0   18
+#define RELAY_PIN_CH1   19
+#define RELAY_PIN_CH2   21
+
 
 // 3路传感器通道状态指示灯引脚
 #define LED_PIN_CH0     13
@@ -19,14 +20,14 @@
 // 10步状态机阶段指示灯引脚 (对应 Stage 0 ~ 9)
 #define LED_PIN_STAGE_0  16
 #define LED_PIN_STAGE_1  17
-#define LED_PIN_STAGE_2  18
-#define LED_PIN_STAGE_3  19
-#define LED_PIN_STAGE_4  21
+#define LED_PIN_STAGE_2  25
+#define LED_PIN_STAGE_3  26
+#define LED_PIN_STAGE_4  27
 #define LED_PIN_STAGE_5  22
 #define LED_PIN_STAGE_6  23
 #define LED_PIN_STAGE_7  32
 #define LED_PIN_STAGE_8  33
-#define LED_PIN_STAGE_9  5
+#define LED_PIN_STAGE_9  33
 
 // 系统运行状态指示灯 (板载 LED)
 #define STATUS_LED_PIN   2
