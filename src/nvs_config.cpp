@@ -17,6 +17,13 @@ static const char NVS_KEY_PORT[]      = "mqtt_port";
 static const char NVS_KEY_MQTT_USER[] = "mqtt_user";
 static const char NVS_KEY_MQTT_PASS[] = "mqtt_pass";
 
+static const char NVS_KEY_DUR_0[]     = "dur_0";
+static const char NVS_KEY_PUMP_0[]    = "pump_0";
+static const char NVS_KEY_DUR_1[]     = "dur_1";
+static const char NVS_KEY_PUMP_1[]    = "pump_1";
+static const char NVS_KEY_DUR_2[]     = "dur_2";
+static const char NVS_KEY_PUMP_2[]    = "pump_2";
+
 // ============================================================
 //  配置项内存缓存（内部私有）
 // ============================================================
@@ -27,6 +34,9 @@ static String s_mqtt_broker  = "";
 static int    s_mqtt_port    = 1883;
 static String s_mqtt_user    = "";
 static String s_mqtt_pass    = "";
+
+static uint32_t s_expected_dur[3]  = { DEFAULT_EXPECTED_DUR_CH0, DEFAULT_EXPECTED_DUR_CH1, DEFAULT_EXPECTED_DUR_CH2 };
+static uint32_t s_pump_work_sec[3] = { DEFAULT_PUMP_WORK_SEC, DEFAULT_PUMP_WORK_SEC, DEFAULT_PUMP_WORK_SEC };
 
 // ============================================================
 //  NVS 初始化
@@ -42,9 +52,20 @@ void nvs_config_init() {
     s_mqtt_user    = s_prefs.getString(NVS_KEY_MQTT_USER, FACTORY_MQTT_USERNAME);
     s_mqtt_pass    = s_prefs.getString(NVS_KEY_MQTT_PASS, FACTORY_MQTT_PASSWORD);
 
+    s_expected_dur[0] = s_prefs.getUInt(NVS_KEY_DUR_0,   DEFAULT_EXPECTED_DUR_CH0);
+    s_expected_dur[1] = s_prefs.getUInt(NVS_KEY_DUR_1,   DEFAULT_EXPECTED_DUR_CH1);
+    s_expected_dur[2] = s_prefs.getUInt(NVS_KEY_DUR_2,   DEFAULT_EXPECTED_DUR_CH2);
+
+    s_pump_work_sec[0] = s_prefs.getUInt(NVS_KEY_PUMP_0, DEFAULT_PUMP_WORK_SEC);
+    s_pump_work_sec[1] = s_prefs.getUInt(NVS_KEY_PUMP_1, DEFAULT_PUMP_WORK_SEC);
+    s_pump_work_sec[2] = s_prefs.getUInt(NVS_KEY_PUMP_2, DEFAULT_PUMP_WORK_SEC);
+
     Serial.printf("[NvsConfig] Loaded WiFi STA SSID: %s\n", s_sta_ssid.c_str());
     Serial.printf("[NvsConfig] Station Name: %s, MQTT Broker: %s:%d\n",
                   s_sta_name.c_str(), s_mqtt_broker.c_str(), s_mqtt_port);
+    Serial.printf("[NvsConfig] Channels Dur: %u, %u, %u | Pump: %u, %u, %u\n",
+                  s_expected_dur[0], s_expected_dur[1], s_expected_dur[2],
+                  s_pump_work_sec[0], s_pump_work_sec[1], s_pump_work_sec[2]);
 }
 
 // ============================================================
@@ -107,5 +128,31 @@ bool nvs_set_mqtt_pass(const String& val) {
     if (val == s_mqtt_pass) return false;
     s_mqtt_pass = val;
     s_prefs.putString(NVS_KEY_MQTT_PASS, val);
+    return true;
+}
+
+uint32_t get_expected_dur(int idx) {
+    if (idx < 0 || idx >= 3) return 0;
+    return s_expected_dur[idx];
+}
+
+uint32_t get_pump_work_sec(int idx) {
+    if (idx < 0 || idx >= 3) return 0;
+    return s_pump_work_sec[idx];
+}
+
+bool nvs_set_expected_dur(int idx, uint32_t val) {
+    if (idx < 0 || idx >= 3 || val == s_expected_dur[idx]) return false;
+    s_expected_dur[idx] = val;
+    const char* key = (idx == 0) ? NVS_KEY_DUR_0 : ((idx == 1) ? NVS_KEY_DUR_1 : NVS_KEY_DUR_2);
+    s_prefs.putUInt(key, val);
+    return true;
+}
+
+bool nvs_set_pump_work_sec(int idx, uint32_t val) {
+    if (idx < 0 || idx >= 3 || val == s_pump_work_sec[idx]) return false;
+    s_pump_work_sec[idx] = val;
+    const char* key = (idx == 0) ? NVS_KEY_PUMP_0 : ((idx == 1) ? NVS_KEY_PUMP_1 : NVS_KEY_PUMP_2);
+    s_prefs.putUInt(key, val);
     return true;
 }

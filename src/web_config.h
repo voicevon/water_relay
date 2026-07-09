@@ -62,3 +62,12 @@ String get_mqtt_user();
  * @brief 从 NVS 获取配置的 MQTT 登录密码
  */
 String get_mqtt_pass();
+
+/**
+ * @brief 3个通道的预计流量时间与水泵动作时间参数读写接口
+ */
+uint32_t get_expected_dur(int idx);
+uint32_t get_pump_work_sec(int idx);
+bool nvs_set_expected_dur(int idx, uint32_t val);
+bool nvs_set_pump_work_sec(int idx, uint32_t val);
+

@@ -437,14 +437,74 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
     <div class="overlay" id="overlay" onclick="toggleDrawer(false)"></div>
     <div class="drawer" id="drawer">
         <div style="height: 1rem;"></div>
-        <div class="nav-link active" data-tab="tab-monitor" onclick="switchTab(this)">实时运行监控</div>
-        <div class="nav-link" data-tab="tab-wifi" onclick="switchTab(this)">网络与系统配置</div>
+        <div class="nav-link active" data-tab="tab-monitor" onclick="switchTab(this)">时间监控</div>
+        <div class="nav-link" data-tab="tab-params" onclick="switchTab(this)">参数配置</div>
+        <div class="nav-link" data-tab="tab-wifi" onclick="switchTab(this)">网络配置</div>
         <div class="nav-link" data-tab="tab-about" onclick="switchTab(this)">关于</div>
     </div>
 
     <div class="container">
-        <!-- 实时监控 TAB -->
+        <!-- 时间监控 TAB -->
         <div id="tab-monitor" class="tab-content active">
+            <!-- 继电器/水泵通道列表 -->
+            <div class="card">
+                <div class="grid-3" id="relay-grid">
+                    <!-- JS 动态渲染 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 参数配置 TAB -->
+        <div id="tab-params" class="tab-content">
+            <div class="card">
+                <div class="card-title">参数配置</div>
+                <form id="params-form" onsubmit="saveParams(event)">
+                    <!-- 通道 1 -->
+                    <div style="margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                        <h4 style="font-size: 1rem; font-weight: 600; color: var(--accent-blue); margin-bottom: 0.75rem;">通道 #1</h4>
+                        <div class="form-group">
+                            <label for="dur_0">预计流量时间 (分钟)</label>
+                            <input type="number" id="dur_0" name="dur_0" step="any" placeholder="请输入预计流量时间" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="pump_0">水泵动作时长 (秒)</label>
+                            <input type="number" id="pump_0" name="pump_0" placeholder="请输入动作时长" required>
+                        </div>
+                    </div>
+                    
+                    <!-- 通道 2 -->
+                    <div style="margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                        <h4 style="font-size: 1rem; font-weight: 600; color: var(--accent-blue); margin-bottom: 0.75rem;">通道 #2</h4>
+                        <div class="form-group">
+                            <label for="dur_1">预计流量时间 (分钟)</label>
+                            <input type="number" id="dur_1" name="dur_1" step="any" placeholder="请输入预计流量时间" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="pump_1">水泵动作时长 (秒)</label>
+                            <input type="number" id="pump_1" name="pump_1" placeholder="请输入动作时长" required>
+                        </div>
+                    </div>
+
+                    <!-- 通道 3 -->
+                    <div style="margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                        <h4 style="font-size: 1rem; font-weight: 600; color: var(--accent-blue); margin-bottom: 0.75rem;">通道 #3</h4>
+                        <div class="form-group">
+                            <label for="dur_2">预计流量时间 (分钟)</label>
+                            <input type="number" id="dur_2" name="dur_2" step="any" placeholder="请输入预计流量时间" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="pump_2">水泵动作时长 (秒)</label>
+                            <input type="number" id="pump_2" name="pump_2" placeholder="请输入动作时长" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn" style="width: 100%;">保存参数</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 网络配置 TAB -->
+        <div id="tab-wifi" class="tab-content">
             <!-- 信号强度与连接信息 -->
             <div class="card" style="padding: 1rem 1.5rem; margin-bottom: 1.25rem;">
                 <div class="info-bar">
@@ -466,31 +526,6 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
                 </div>
             </div>
 
-            <!-- 继电器/水泵通道列表 -->
-            <div class="card">
-                <div class="card-title">
-                    <span>3 水泵通道控制状态</span>
-                    <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">状态机驱动 (10步法)</span>
-                </div>
-                <div class="grid-3" id="relay-grid">
-                    <!-- JS 动态渲染 -->
-                </div>
-            </div>
-
-            <!-- 传感器物理通道列表 -->
-            <div class="card">
-                <div class="card-title">
-                    <span>3 通道输入传感器值</span>
-                    <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">自动更新(1Hz)</span>
-                </div>
-                <div class="grid-4" id="sensor-grid">
-                    <!-- JS 动态渲染 -->
-                </div>
-            </div>
-        </div>
-
-        <!-- 系统与网络配置 TAB -->
-        <div id="tab-wifi" class="tab-content">
             <!-- WiFi & MQTT 物理状态卡片 -->
             <div class="card" style="padding: 1rem 1.5rem; margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; align-items: flex-start; font-size: 0.95rem;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -504,10 +539,10 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             </div>
             
             <div class="card">
-                <div class="card-title">无线局域网连接 (Wi-Fi STA)</div>
+                <div class="card-title">WiFi</div>
                 <form id="wifi-form" onsubmit="saveWifi(event)">
                     <div class="form-group">
-                        <label for="ssid">Wi-Fi 网络名称 (SSID)</label>
+                        <label for="ssid">WiFi SSID</label>
                         <div style="display: flex; gap: 0.5rem;">
                             <input type="text" id="ssid" name="ssid" placeholder="请输入 WiFi SSID" style="flex: 1;" required>
                             <button type="button" class="btn" style="width: auto; padding: 0.5rem 1rem; font-size: 0.85rem;" onclick="scanWifi(this)">扫描</button>
@@ -515,7 +550,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
                         <div id="wifi-list" class="wifi-list"></div>
                     </div>
                     <div class="form-group">
-                        <label for="password">Wi-Fi 密码 (Password)</label>
+                        <label for="password">WiFi Password</label>
                         <input type="password" id="password" name="password" placeholder="请输入密码">
                     </div>
 
@@ -524,23 +559,23 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
                     </div>
 
                     <div class="form-group">
-                        <label for="name">设备站点标识 (STATION_NAME)</label>
+                        <label for="name">设备站点标识</label>
                         <input type="text" id="name" name="name" placeholder="例如: home" required>
                     </div>
                     <div class="form-group">
-                        <label for="broker">MQTT Broker 地址 (域名或 IP)</label>
+                        <label for="broker">MQTT Broker 地址</label>
                         <input type="text" id="broker" name="broker" placeholder="例如: voicevon.vicp.io" required>
                     </div>
                     <div class="form-group">
-                        <label for="port">MQTT 端口 (Port)</label>
+                        <label for="port">MQTT 端口</label>
                         <input type="number" id="port" name="port" min="1" max="65535" placeholder="默认: 1883" required>
                     </div>
                     <div class="form-group">
-                        <label for="user">MQTT 用户名 (Username)</label>
+                        <label for="user">MQTT 用户名</label>
                         <input type="text" id="user" name="user" placeholder="可选，无则留空">
                     </div>
                     <div class="form-group">
-                        <label for="pass_mqtt">MQTT 密码 (Password)</label>
+                        <label for="pass_mqtt">MQTT 密码</label>
                         <input type="password" id="pass_mqtt" name="pass_mqtt" placeholder="可选，无则留空">
                     </div>
 
@@ -586,6 +621,39 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
 
             if (targetId === 'tab-wifi') {
                 fetchWifi();
+            } else if (targetId === 'tab-params') {
+                fetchParams();
+            }
+        }
+
+        async function fetchParams() {
+            try {
+                const res = await fetch('/api/paramconfig');
+                const data = await res.json();
+                document.getElementById('dur_0').value = data.dur_0 !== undefined ? data.dur_0 : '';
+                document.getElementById('pump_0').value = data.pump_0 !== undefined ? data.pump_0 : '';
+                document.getElementById('dur_1').value = data.dur_1 !== undefined ? data.dur_1 : '';
+                document.getElementById('pump_1').value = data.pump_1 !== undefined ? data.pump_1 : '';
+                document.getElementById('dur_2').value = data.dur_2 !== undefined ? data.dur_2 : '';
+                document.getElementById('pump_2').value = data.pump_2 !== undefined ? data.pump_2 : '';
+            } catch (err) {
+                console.error("Fetch parameter credentials error:", err);
+            }
+        }
+
+        async function saveParams(e) {
+            e.preventDefault();
+            const form = document.getElementById('params-form');
+            const params = new URLSearchParams(new FormData(form));
+            try {
+                const res = await fetch('/api/paramconfig', { method: 'POST', body: params });
+                if (res.ok) {
+                    showToast();
+                } else {
+                    alert("保存参数失败！");
+                }
+            } catch (err) {
+                alert("请求错误：" + err);
             }
         }
 
@@ -732,7 +800,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
                     chDiv.className = `status-item ${r.active ? 'active-run' : ''}`;
                     chDiv.innerHTML = `
                         <div class="item-header">
-                            <span class="item-title">水泵通道 #${r.id}</span>
+                            <span class="item-title">通道 #${r.id}</span>
                             <div class="badge-list">
                                 <span class="badge ${r.active ? 'green' : 'gray'}">${r.active ? '采样中' : '空闲'}</span>
                                 <span class="badge ${r.pump_on ? 'orange' : 'gray'}">${r.pump_on ? '水泵开' : '水泵关'}</span>
@@ -747,25 +815,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
                     relayGrid.appendChild(chDiv);
                 });
 
-                // 3. 更新 3 个传感器输入值
-                const sensorGrid = document.getElementById('sensor-grid');
-                sensorGrid.innerHTML = '';
-                data.sensors.forEach((s, idx) => {
-                    const isWater = s.detected;
-                    const chDiv = document.createElement('div');
-                    chDiv.className = `status-item ${isWater ? 'water-detected' : ''}`;
-                    chDiv.innerHTML = `
-                        <div class="item-header">
-                            <span class="item-title">传感器 #${idx + 1}</span>
-                            <span class="badge ${isWater ? 'blue' : 'gray'}">${isWater ? '有水' : '无水'}</span>
-                        </div>
-                        <div class="item-meta">
-                            <div>测得电容值: <span>${(s.raw / 100.0).toFixed(2)} pF</span></div>
-                            <div style="margin-top: 4px; color: var(--text-muted);">状态字直接解码: <span>${isWater ? '有水' : '无水'}</span></div>
-                        </div>
-                    `;
-                    sensorGrid.appendChild(chDiv);
-                });
+                // 传感器卡片已移除，此处不再进行渲染
 
             } catch (err) {
                 console.error("Fetch dashboard data error:", err);

@@ -59,16 +59,16 @@ void handleSensorData(uint16_t sensor1, uint16_t sensor2, uint16_t sensor3, uint
     g_sensor_states[1] = (stateByte & 0x02) != 0;
     g_sensor_states[2] = (stateByte & 0x04) != 0;
 
-    Serial.printf("[APP GATEWAY] RX: #1=%u #2=%u #3=%u, States: #1=%d #2=%d #3=%d\n",
-                  sensor1, sensor2, sensor3,
-                  g_sensor_states[0], g_sensor_states[1], g_sensor_states[2]);
+    // Serial.printf("[APP GATEWAY] RX: #1=%u #2=%u #3=%u, States: #1=%d #2=%d #3=%d\n",
+    //               sensor1, sensor2, sensor3,
+    //               g_sensor_states[0], g_sensor_states[1], g_sensor_states[2]);
 
     // 检测有无水状态变化以发布 MQTT 日志
     for (int i = 0; i < 3; i++) {
         int sensorCh = SENSOR_MAP[i];
         if (g_sensor_states[sensorCh] != prevStates[sensorCh]) {
             char logMsg[64];
-            snprintf(logMsg, sizeof(logMsg), "通道%d 传感器检测到%s", i, g_sensor_states[sensorCh] ? "有水" : "无水");
+            snprintf(logMsg, sizeof(logMsg), "通道%d 传感器检测到%s", i + 1, g_sensor_states[sensorCh] ? "有水" : "无水");
             gateway.publishLog(channels[i].id, logMsg);
             Serial.printf("[APP SENSOR] Channel %d mapped sensor state changed to %s\n", i, g_sensor_states[sensorCh] ? "HAS_WATER" : "NO_WATER");
         }
@@ -81,7 +81,8 @@ void handleConfigDuration(int channelId, float durationMinutes) {
         if (channels[i].id == channelId) {
             uint32_t newDur = (uint32_t)(durationMinutes * 60.0f);
             channels[i].updateParameters(newDur, channels[i].pumpWorkTime);
-            Serial.printf("[CONFIG] Channel %d duration updated to %d sec via MQTT.\n", channelId, newDur);
+            nvs_set_expected_dur(i, newDur);
+            Serial.printf("[CONFIG] Channel %d duration updated to %d sec via MQTT and saved to NVS.\n", channelId, newDur);
             break;
         }
     }
@@ -93,7 +94,8 @@ void handleConfigPumpTime(int channelId, float pumpTimeSeconds) {
         if (channels[i].id == channelId) {
             uint32_t newPump = (uint32_t)pumpTimeSeconds;
             channels[i].updateParameters(channels[i].expectedDuration, newPump);
-            Serial.printf("[CONFIG] Channel %d pump work time updated to %d sec via MQTT.\n", channelId, newPump);
+            nvs_set_pump_work_sec(i, newPump);
+            Serial.printf("[CONFIG] Channel %d pump work time updated to %d sec via MQTT and saved to NVS.\n", channelId, newPump);
             break;
         }
     }
@@ -154,6 +156,15 @@ void setup() {
 
     // 启动 Web 服务器和 AP 模式 (动态从 NVS 中加载 STA WiFi 凭证)
     web_config_init();
+
+    // 从 NVS 中加载并更新各通道的运行参数
+    for (int i = 0; i < 3; i++) {
+        uint32_t dur = get_expected_dur(i);
+        uint32_t pump = get_pump_work_sec(i);
+        channels[i].updateParameters(dur, pump);
+        Serial.printf("[MAIN] Channel %d parameters loaded from NVS: expectedDuration = %u s, pumpWorkTime = %u s\n",
+                      channels[i].id, dur, pump);
+    }
 
     // 启动网关网络通信
     pinMode(STATUS_LED_PIN, OUTPUT);
@@ -239,7 +250,7 @@ void loop() {
         if (channels[i].currentStage != lastStages[i]) {
             lastStages[i] = channels[i].currentStage;
             char logMsg[64];
-            snprintf(logMsg, sizeof(logMsg), "通道%d 状态跳转 -> Stage %d", i, channels[i].currentStage);
+            snprintf(logMsg, sizeof(logMsg), "通道%d 状态跳转 -> Stage %d", i + 1, channels[i].currentStage);
             gateway.publishLog(channels[i].id, logMsg);
         }
     }

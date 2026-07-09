@@ -190,12 +190,12 @@ void SmartGateway::AdvertisedDeviceCallbacks::onResult(BLEAdvertisedDevice adver
     if (_instance && advertisedDevice.getName() == _instance->_targetBleName.c_str()) {
         if (advertisedDevice.haveManufacturerData()) {
             std::string data = advertisedDevice.getManufacturerData();
-            if (data.length() == 11 || data.length() == 12) {
+            if (data.length() == 9 || data.length() == 10) {
                 uint8_t cIdLsb = (uint8_t)data[0];
                 uint8_t cIdMsb = (uint8_t)data[1];
                 uint16_t cId = (cIdMsb << 8) | cIdLsb;
                 if (cId == _instance->_bleCompanyIdVal) {
-                    uint8_t seqNum = (data.length() == 12) ? (uint8_t)data[11] : (uint8_t)data[10];
+                    uint8_t seqNum = (data.length() == 10) ? (uint8_t)data[9] : (uint8_t)data[8];
                     if (seqNum != _instance->_lastSeqNum) {
                         _instance->_lastSeqNum = seqNum;
                         _instance->_bleConnected = true;
@@ -204,9 +204,9 @@ void SmartGateway::AdvertisedDeviceCallbacks::onResult(BLEAdvertisedDevice adver
                         uint16_t sensor1 = ((uint8_t)data[2] << 8) | (uint8_t)data[3];
                         uint16_t sensor2 = ((uint8_t)data[4] << 8) | (uint8_t)data[5];
                         uint16_t sensor3 = ((uint8_t)data[6] << 8) | (uint8_t)data[7];
-                        uint8_t stateByte = (data.length() == 12) ? (uint8_t)data[10] : 0;
+                        uint8_t stateByte = (data.length() == 10) ? (uint8_t)data[8] : 0;
 
-                        Serial.printf("[GATEWAY BLE] 接收到唯一广播包, seqNum=%u, stateByte=0x%02X\n", seqNum, stateByte);
+                        // Serial.printf("[GATEWAY BLE] 接收到唯一广播包, seqNum=%u, stateByte=0x%02X\n", seqNum, stateByte);
 
                         if (_instance->_sensorCb) {
                             _instance->_sensorCb(sensor1, sensor2, sensor3, stateByte);

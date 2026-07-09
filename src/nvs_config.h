@@ -19,3 +19,12 @@ bool nvs_set_mqtt_broker(const String& val);
 bool nvs_set_mqtt_port(int val);
 bool nvs_set_mqtt_user(const String& val);
 bool nvs_set_mqtt_pass(const String& val);
+
+/**
+ * @brief 3个通道的预计流量时间与水泵动作时间参数读写接口
+ */
+uint32_t get_expected_dur(int idx);
+uint32_t get_pump_work_sec(int idx);
+bool nvs_set_expected_dur(int idx, uint32_t val);
+bool nvs_set_pump_work_sec(int idx, uint32_t val);
+

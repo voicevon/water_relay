@@ -34,8 +34,10 @@ static void print_wifi_status(const char* label) {
 // ============================================================
 
 #include <SmartGateway.h>
+#include "SamplingController.h"
 
 extern SmartGateway gateway;
+extern SamplingController channels[3];
 
 // GET /api/data — 返回实时网关状态及传感器/继电器数据
 static void handle_get_data() {
@@ -142,6 +144,47 @@ static void handle_wifi_scan() {
     s_server.send(200, "application/json", json);
 }
 
+// GET /api/paramconfig — 返回各个通道的预计流量时间(分钟)与水泵动作时长(秒)
+static void handle_get_paramconfig() {
+    String json = "{";
+    json += "\"dur_0\":"  + String(get_expected_dur(0) / 60.0f) + ",";
+    json += "\"pump_0\":" + String(get_pump_work_sec(0)) + ",";
+    json += "\"dur_1\":"  + String(get_expected_dur(1) / 60.0f) + ",";
+    json += "\"pump_1\":" + String(get_pump_work_sec(1)) + ",";
+    json += "\"dur_2\":"  + String(get_expected_dur(2) / 60.0f) + ",";
+    json += "\"pump_2\":" + String(get_pump_work_sec(2));
+    json += "}";
+    s_server.send(200, "application/json", json);
+}
+
+// POST /api/paramconfig — 保存运行参数至 NVS 并更新状态机
+static void handle_post_paramconfig() {
+    bool changed = false;
+    for (int i = 0; i < 3; i++) {
+        String durArg = "dur_" + String(i);
+        String pumpArg = "pump_" + String(i);
+        if (s_server.hasArg(durArg)) {
+            float durMinutes = s_server.arg(durArg).toFloat();
+            uint32_t newDurSec = (uint32_t)(durMinutes * 60.0f);
+            if (nvs_set_expected_dur(i, newDurSec)) {
+                channels[i].updateParameters(newDurSec, channels[i].pumpWorkTime);
+                changed = true;
+            }
+        }
+        if (s_server.hasArg(pumpArg)) {
+            uint32_t newPumpSec = (uint32_t)s_server.arg(pumpArg).toInt();
+            if (nvs_set_pump_work_sec(i, newPumpSec)) {
+                channels[i].updateParameters(channels[i].expectedDuration, newPumpSec);
+                changed = true;
+            }
+        }
+    }
+    if (changed) {
+        Serial.println("[WebConfig] Channel parameters updated via Web Config and saved to NVS.");
+    }
+    s_server.send(200, "text/plain", "OK");
+}
+
 // ============================================================
 //  公共接口实现
 // ============================================================
@@ -166,6 +209,8 @@ void web_config_init() {
     s_server.on("/api/wifi",      HTTP_GET,  handle_get_sysconfig);   // 兼容旧接口
     s_server.on("/api/wifi",      HTTP_POST, handle_post_sysconfig);  // 兼容旧接口
     s_server.on("/api/scan",      HTTP_GET,  handle_wifi_scan);
+    s_server.on("/api/paramconfig", HTTP_GET,  handle_get_paramconfig);
+    s_server.on("/api/paramconfig", HTTP_POST, handle_post_paramconfig);
 
     s_server.begin();
     Serial.println("[WebConfig] Built-in Web Server started on port 80");
