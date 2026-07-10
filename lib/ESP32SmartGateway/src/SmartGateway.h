@@ -39,8 +39,8 @@ class SmartGateway {
 public:
     // 事件回调函数指针定义
     typedef void (*SensorDataCallback)(uint16_t sensor1, uint16_t sensor2, uint16_t sensor3, uint8_t stateByte);
-    typedef void (*ConfigDurationCallback)(int channelId, float durationMinutes);
-    typedef void (*ConfigPumpTimeCallback)(int channelId, float pumpTimeSeconds);
+    typedef void (*ConfigDurationCallback)(int sensorId, float durationMinutes);
+    typedef void (*ConfigPumpTimeCallback)(int sensorId, float pumpTimeSeconds);
 
     SmartGateway(SensorSource source = SensorSource::BLE);
 
@@ -55,9 +55,9 @@ public:
     void onConfigDuration(ConfigDurationCallback cb);
     void onConfigPumpTime(ConfigPumpTimeCallback cb);
 
-    // 上报数据与诊断日志接口
-    void publishStatus(const char* jsonPayload);
-    void publishLog(int channelId, const char* logMessage);
+    // 上报数据与状态接口
+    bool publishStatus(const char* jsonPayload);
+    bool publishSensorState(int sensorId, int stage, const char* remark, float duration, int pumpTime, uint32_t uptime, uint32_t stageStartSec);
     
     // 查询蓝牙连接状态
     bool isBleConnected() const;

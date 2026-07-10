@@ -63,7 +63,7 @@ void nvs_config_init() {
     Serial.printf("[NvsConfig] Loaded WiFi STA SSID: %s\n", s_sta_ssid.c_str());
     Serial.printf("[NvsConfig] Station Name: %s, MQTT Broker: %s:%d\n",
                   s_sta_name.c_str(), s_mqtt_broker.c_str(), s_mqtt_port);
-    Serial.printf("[NvsConfig] Channels Dur: %u, %u, %u | Pump: %u, %u, %u\n",
+    Serial.printf("[NvsConfig] Sensors Dur: %u, %u, %u | Pump: %u, %u, %u\n",
                   s_expected_dur[0], s_expected_dur[1], s_expected_dur[2],
                   s_pump_work_sec[0], s_pump_work_sec[1], s_pump_work_sec[2]);
 }

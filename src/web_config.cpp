@@ -37,7 +37,7 @@ static void print_wifi_status(const char* label) {
 #include "SamplingController.h"
 
 extern SmartGateway gateway;
-extern SamplingController channels[3];
+extern SamplingController sensors[3];
 
 // GET /api/data — 返回实时网关状态及传感器/继电器数据
 static void handle_get_data() {
@@ -167,20 +167,20 @@ static void handle_post_paramconfig() {
             float durMinutes = s_server.arg(durArg).toFloat();
             uint32_t newDurSec = (uint32_t)(durMinutes * 60.0f);
             if (nvs_set_expected_dur(i, newDurSec)) {
-                channels[i].updateParameters(newDurSec, channels[i].pumpWorkTime);
+                sensors[i].updateParameters(newDurSec, sensors[i].pumpWorkTime);
                 changed = true;
             }
         }
         if (s_server.hasArg(pumpArg)) {
             uint32_t newPumpSec = (uint32_t)s_server.arg(pumpArg).toInt();
             if (nvs_set_pump_work_sec(i, newPumpSec)) {
-                channels[i].updateParameters(channels[i].expectedDuration, newPumpSec);
+                sensors[i].updateParameters(sensors[i].expectedDuration, newPumpSec);
                 changed = true;
             }
         }
     }
     if (changed) {
-        Serial.println("[WebConfig] Channel parameters updated via Web Config and saved to NVS.");
+        Serial.println("[WebConfig] Sensor parameters updated via Web Config and saved to NVS.");
     }
     s_server.send(200, "text/plain", "OK");
 }

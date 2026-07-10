@@ -105,14 +105,24 @@ void SmartGateway::onConfigPumpTime(ConfigPumpTimeCallback cb) {
     _pumpTimeCb = cb;
 }
 
-void SmartGateway::publishStatus(const char* jsonPayload) {
+bool SmartGateway::publishStatus(const char* jsonPayload) {
     String topic = "water/" + _stationName + "/system/status";
-    _netManager.publish(topic.c_str(), jsonPayload);
+    return _netManager.publish(topic.c_str(), (const uint8_t*)jsonPayload, strlen(jsonPayload), true);
 }
 
-void SmartGateway::publishLog(int channelId, const char* logMessage) {
-    String topic = "water/" + _stationName + "/log/" + String(channelId);
-    _netManager.publish(topic.c_str(), logMessage);
+bool SmartGateway::publishSensorState(int sensorId, int stage, const char* remark, float duration, int pumpTime, uint32_t uptime, uint32_t stageStartSec) {
+    String topic = "water/" + _stationName + "/state";
+    StaticJsonDocument<256> doc;
+    doc["sensorId"] = sensorId;
+    doc["stage"] = stage;
+    doc["remark"] = remark;
+    doc["duration"] = duration;
+    doc["pumpTime"] = pumpTime;
+    doc["uptime"] = uptime;
+    doc["stageStartSec"] = stageStartSec;
+    String jsonPayload;
+    serializeJson(doc, jsonPayload);
+    return _netManager.publish(topic.c_str(), (const uint8_t*)jsonPayload.c_str(), jsonPayload.length(), true);
 }
 
 bool SmartGateway::isBleConnected() const {
@@ -165,14 +175,14 @@ void SmartGateway::handleMqttMessage(char* topic, byte* payload, unsigned int le
     String pumpTimePrefix = "water/" + stationName + "/config/pump_time/";
 
     if (topicStr.startsWith(durationPrefix)) {
-        int channelId = topicStr.substring(durationPrefix.length()).toInt();
+        int sensorId = topicStr.substring(durationPrefix.length()).toInt();
         if (_durationCb) {
-            _durationCb(channelId, value);
+            _durationCb(sensorId, value);
         }
     } else if (topicStr.startsWith(pumpTimePrefix)) {
-        int channelId = topicStr.substring(pumpTimePrefix.length()).toInt();
+        int sensorId = topicStr.substring(pumpTimePrefix.length()).toInt();
         if (_pumpTimeCb) {
-            _pumpTimeCb(channelId, value);
+            _pumpTimeCb(sensorId, value);
         }
     }
 }

@@ -24,6 +24,7 @@ public:
     bool lastPumpState;          // 上一次水泵开启状态（用于防抖判定及计数）
     uint32_t onCount;            // 本次周期内水泵累计开启次数
     uint32_t offCount;           // 本次周期内水泵累计关闭次数
+    uint32_t stageStartTime;     // 记录当前阶段开始的时间戳（秒）
 
     /**
      * @brief 构造函数
@@ -47,7 +48,6 @@ public:
     bool update(bool detected);
 
 private:
-    uint32_t stageStartTime; // 记录当前阶段开始的时间戳（秒）
     uint32_t restTime;       // 计算出的休眠时长
 
     void transitionTo(int targetStage, uint32_t nowSec);
