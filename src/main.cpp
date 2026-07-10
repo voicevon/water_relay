@@ -214,15 +214,15 @@ void loop() {
     }
 
     // 2. 确定当前正在运行采样的传感器的 Stage
-    int activeStage = 0;
+    int activeStage = 1;
     if (sensors[0].active) activeStage = sensors[0].currentStage;
     else if (sensors[1].active) activeStage = sensors[1].currentStage;
     else if (sensors[2].active) activeStage = sensors[2].currentStage;
     else activeStage = sensors[0].currentStage; // 缺省空闲阶段
 
     // 3. 更新 10 步状态机指示灯，仅点亮当前 Stage 对应的指示灯，熄灭其他 9 个
-    for (int stage = 0; stage < 10; stage++) {
-        digitalWrite(STAGE_LED_PINS[stage], (stage == activeStage) ? HIGH : LOW);
+    for (int stage = 1; stage <= 10; stage++) {
+        digitalWrite(STAGE_LED_PINS[stage - 1], (stage == activeStage) ? HIGH : LOW);
     }
 
     // 定义流程状态中文描述模板
@@ -244,7 +244,7 @@ void loop() {
         if (sensors[i].currentStage != lastStages[i]) {
             lastStages[i] = sensors[i].currentStage;
             int stg = sensors[i].currentStage;
-            const char* remark = (stg >= 0 && stg < 10) ? STAGE_REMARKS[stg] : "未知状态";
+            const char* remark = (stg >= 1 && stg <= 10) ? STAGE_REMARKS[stg - 1] : "未知状态";
             gateway.publishSensorState(
                 sensors[i].id, 
                 stg, 
@@ -278,7 +278,7 @@ void loop() {
             if (sensors[i].active) {
                 anyActive = true;
                 int stg = sensors[i].currentStage;
-                const char* remark = (stg >= 0 && stg < 10) ? STAGE_REMARKS[stg] : "未知状态";
+                const char* remark = (stg >= 1 && stg <= 10) ? STAGE_REMARKS[stg - 1] : "未知状态";
                 gateway.publishSensorState(
                     sensors[i].id, 
                     stg, 
@@ -292,7 +292,7 @@ void loop() {
         }
         if (!anyActive) {
             int stg = sensors[0].currentStage;
-            const char* remark = (stg >= 0 && stg < 10) ? STAGE_REMARKS[stg] : "未知状态";
+            const char* remark = (stg >= 1 && stg <= 10) ? STAGE_REMARKS[stg - 1] : "未知状态";
             gateway.publishSensorState(
                 sensors[0].id, 
                 stg, 

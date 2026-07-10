@@ -18,8 +18,8 @@ public:
     float safetyFactor;          // 采样安全系数（用以计算实际可用时长）
     
     // 状态机运行时参数
-    int currentStage;            // 当前所处的 10 步状态机阶段 (Stage 0 ~ 9)
-    bool active;                 // 采样流程是否处于执行中 (Stage 1~8 为 true，Stage 0和9 空闲/结束为 false)
+    int currentStage;            // 当前所处的 10 步状态机阶段 (Stage 1 ~ 10)
+    bool active;                 // 采样流程是否处于执行中 (Stage 2~9 为 true，Stage 1和10 空闲/结束为 false)
     bool isDetected;             // 当前传感器是否检测到有水
     bool lastPumpState;          // 上一次水泵开启状态（用于防抖判定及计数）
     uint32_t onCount;            // 本次周期内水泵累计开启次数
