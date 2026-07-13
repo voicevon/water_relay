@@ -125,6 +125,11 @@ bool SmartGateway::publishSensorState(int sensorId, int stage, const char* remar
     return _netManager.publish(topic.c_str(), (const uint8_t*)jsonPayload.c_str(), jsonPayload.length(), true);
 }
 
+bool SmartGateway::publishPhotoTake(const char* targetStation) {
+    String topic = "water/photo/take";
+    return _netManager.publish(topic.c_str(), (const uint8_t*)targetStation, strlen(targetStation), false);
+}
+
 bool SmartGateway::isBleConnected() const {
     return _bleConnected;
 }

@@ -58,6 +58,10 @@ public:
     // 上报数据与状态接口
     bool publishStatus(const char* jsonPayload);
     bool publishSensorState(int sensorId, int stage, const char* remark, float duration, int pumpTime, uint32_t uptime, uint32_t stageStartSec);
+    bool publishPhotoTake(const char* targetStation);
+
+    // 获取当前站点名称
+    const char* getStationName() const { return _stationName.c_str(); }
     
     // 查询蓝牙连接状态
     bool isBleConnected() const;

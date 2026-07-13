@@ -11,6 +11,10 @@
 #define RELAY_PIN_CH1   19
 #define RELAY_PIN_CH2   21
 
+// 继电器高低电平控制逻辑反转定义 (LOW为通电开启，HIGH为断电关闭)
+#define RELAY_ON        LOW
+#define RELAY_OFF       HIGH
+
 
 // 3路传感器通道状态指示灯引脚
 #define LED_PIN_CH0     13

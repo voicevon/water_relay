@@ -118,7 +118,7 @@ void setup() {
     // 初始化 3 路水泵继电器引脚与 3 路传感器状态指示灯引脚
     for (int i = 0; i < 3; i++) {
         pinMode(sensors[i].relayPin, OUTPUT);
-        digitalWrite(sensors[i].relayPin, LOW); // 默认关闭水泵
+        digitalWrite(sensors[i].relayPin, RELAY_OFF); // 默认关闭水泵
         pinMode(sensors[i].ledPin, OUTPUT);
         digitalWrite(sensors[i].ledPin, LOW);   // 默认关闭传感器指示灯
     }
@@ -208,8 +208,17 @@ void loop() {
     sensorPumps[2] = sensors[2].update(g_sensor_states[SENSOR_MAP_PUMP_2]);
 
     // 1. 直接控制 3 路水泵继电器引脚与 3 路传感器指示 LED
+    static bool lastPhysicalPumpStates[3] = {false, false, false};
     for (int i = 0; i < 3; i++) {
-        digitalWrite(sensors[i].relayPin, sensorPumps[i] ? HIGH : LOW);
+        bool currentPumpState = sensorPumps[i];
+        if (currentPumpState != lastPhysicalPumpStates[i]) {
+            lastPhysicalPumpStates[i] = currentPumpState;
+            if (currentPumpState) {
+                Serial.printf("[MAIN] Pump %d started, publishing photo take trigger.\n", i);
+                gateway.publishPhotoTake(gateway.getStationName());
+            }
+        }
+        digitalWrite(sensors[i].relayPin, currentPumpState ? RELAY_ON : RELAY_OFF);
         digitalWrite(sensors[i].ledPin, sensors[i].isDetected ? HIGH : LOW);
     }
 
