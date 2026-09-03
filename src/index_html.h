@@ -46,14 +46,20 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             width: 100%;
             background: var(--nav-bg);
             border-bottom: 1px solid var(--border-color);
-            padding: 1rem 1.5rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            padding: 0.85rem 1.5rem;
             position: sticky;
             top: 0;
             z-index: 100;
             backdrop-filter: blur(8px);
+        }
+
+        .header-main {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
         }
 
         .logo {
@@ -65,77 +71,85 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             -webkit-text-fill-color: transparent;
         }
 
-        .menu-btn {
-            background: transparent;
-            border: none;
-            color: var(--text-main);
-            font-size: 1.5rem;
-            cursor: pointer;
-            outline: none;
-            width: 40px;
-            height: 40px;
+        .status-dots {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.3rem 0.65rem;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .status-indicator {
             display: flex;
             align-items: center;
-            justify-content: center;
-            border-radius: 8px;
-            transition: background 0.2s;
+            gap: 0.35rem;
         }
 
-        .menu-btn:hover {
-            background: rgba(255, 255, 255, 0.05);
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            background: #64748B;
+            transition: all 0.3s ease;
         }
 
-        /* 侧边菜单 */
-        .drawer {
-            position: fixed;
-            top: 0;
-            right: 0;
-            width: 250px;
-            height: 100%;
-            background: #111827;
-            border-left: 1px solid var(--border-color);
-            box-shadow: -10px 0 30px rgba(0,0,0,0.5);
-            transform: translateX(100%);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 200;
-            padding: 2rem 1.5rem;
+        .dot.on {
+            background: #10B981;
+            box-shadow: 0 0 8px #10B981;
+        }
+
+        .dot.off {
+            background: #EF4444;
+            box-shadow: 0 0 4px #EF4444;
+        }
+
+        /* 顶部 Tab 导航风格 */
+        .nav-tabs {
             display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 0.3rem;
+            margin-bottom: 0.5rem;
+            gap: 0.3rem;
         }
 
-        .drawer.open {
-            transform: translateX(0);
-        }
-
-        .nav-link {
+        .tab-item {
+            flex: 1;
+            text-align: center;
+            padding: 0.65rem 0.5rem;
+            font-size: 0.88rem;
+            font-weight: 600;
             color: var(--text-muted);
-            text-decoration: none;
-            font-size: 1.1rem;
-            font-weight: 500;
-            transition: color 0.2s;
+            border-radius: 8px;
             cursor: pointer;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid rgba(255,255,255,0.02);
+            transition: all 0.2s ease;
+            user-select: none;
         }
 
-        .nav-link:hover, .nav-link.active {
+        .tab-item:hover {
+            color: var(--text-main);
+        }
+
+        .tab-item.active {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(6, 182, 212, 0.18));
             color: var(--accent-blue);
+            border: 1px solid rgba(56, 189, 248, 0.35);
         }
 
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 150;
-            display: none;
-        }
-
-        .overlay.show {
-            display: block;
+        .footer {
+            text-align: center;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 1rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 1rem;
+            line-height: 1.8;
         }
 
         /* 主容器 */
@@ -429,21 +443,22 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
 <body>
 
     <header>
-        <div class="logo">水泵控制节点</div>
-        <button class="menu-btn" onclick="toggleDrawer(true)">☰</button>
+        <div class="header-main">
+            <div class="logo">💧 水泵控制节点</div>
+            <div class="status-dots">
+                <span class="status-indicator"><span class="dot" id="dot-wifi"></span>WiFi</span>
+                <span class="status-indicator"><span class="dot" id="dot-mqtt"></span>MQTT</span>
+            </div>
+        </div>
     </header>
 
-    <!-- 侧边菜单 -->
-    <div class="overlay" id="overlay" onclick="toggleDrawer(false)"></div>
-    <div class="drawer" id="drawer">
-        <div style="height: 1rem;"></div>
-        <div class="nav-link active" data-tab="tab-monitor" onclick="switchTab(this)">时间监控</div>
-        <div class="nav-link" data-tab="tab-params" onclick="switchTab(this)">参数配置</div>
-        <div class="nav-link" data-tab="tab-wifi" onclick="switchTab(this)">网络配置</div>
-        <div class="nav-link" data-tab="tab-about" onclick="switchTab(this)">关于</div>
-    </div>
-
     <div class="container">
+        <!-- 顶部导航 Tabs -->
+        <nav class="nav-tabs">
+            <div class="tab-item active" data-tab="tab-monitor" onclick="switchTab(this)">实时状态</div>
+            <div class="tab-item" data-tab="tab-params" onclick="switchTab(this)">参数配置</div>
+            <div class="tab-item" data-tab="tab-wifi" onclick="switchTab(this)">网络配置</div>
+        </nav>
         <!-- 时间监控 TAB -->
         <div id="tab-monitor" class="tab-content active">
             <!-- 继电器/水泵通道列表 -->
@@ -584,40 +599,24 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             </div>
         </div>
 
-        <!-- 关于 TAB -->
-        <div id="tab-about" class="tab-content">
-            <div class="card">
-                <div class="card-title">关于</div>
-                <div style="line-height: 2; font-size: 0.95rem;">
-                    <p>固件版本：V2.1</p>
-                    <p>软硬件设计：山东卷积分公司</p>
-                    <p style="margin-top: 1.5rem; color: var(--text-muted); font-size: 0.85rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; text-align: center;">
-                        版权所有 © 山东卷积分公司
-                    </p>
-                </div>
-            </div>
+        <div class="footer">
+            <p>版本: Version 2.0</p>
+            <p>版权所有: 山东卷积分公司</p>
         </div>
     </div>
 
     <div id="toast">保存成功，已应用并于后台重连！</div>
 
     <script>
-        // 切换抽屉菜单
-        function toggleDrawer(open) {
-            document.getElementById('drawer').classList.toggle('open', open);
-            document.getElementById('overlay').classList.toggle('show', open);
-        }
-
         // 切换 Tab
         function switchTab(el) {
-            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+            document.querySelectorAll('.tab-item').forEach(link => link.classList.remove('active'));
             el.classList.add('active');
             
             const targetId = el.getAttribute('data-tab');
             document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-            document.getElementById(targetId).classList.add('active');
-            
-            toggleDrawer(false);
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) targetEl.classList.add('active');
 
             if (targetId === 'tab-wifi') {
                 fetchWifi();
@@ -764,6 +763,12 @@ static const char INDEX_HTML[] PROGMEM = R"rawhtml(
             try {
                 const res = await fetch('/api/data');
                 const data = await res.json();
+
+                // 更新顶部常驻状态指示灯
+                const dotWifi = document.getElementById('dot-wifi');
+                const dotMqtt = document.getElementById('dot-mqtt');
+                if (dotWifi) dotWifi.className = 'dot ' + (data.wifi_connected ? 'on' : 'off');
+                if (dotMqtt) dotMqtt.className = 'dot ' + (data.mqtt_connected ? 'on' : 'off');
 
                 // 更新 Wi-Fi 和 MQTT 状态显示
                 const wifiBadge = document.getElementById('wifi-status');
