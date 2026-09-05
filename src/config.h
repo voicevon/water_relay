@@ -65,7 +65,7 @@
 #define BLE_SCAN_DURATION_S  5      // 单次扫描时长（秒）
 
 // -------- WiFi 网络配置 --------
-#define FACTORY_WIFI_SSID       "Perfect"
+#define FACTORY_WIFI_SSID       "Juanjifen"
 #define FACTORY_WIFI_PASSWORD   "12344321"
 
 #define FACTORY_WIFI_AP_SSID    "AP_Relay"

@@ -28,3 +28,8 @@ uint32_t get_pump_work_sec(int idx);
 bool nvs_set_expected_dur(int idx, uint32_t val);
 bool nvs_set_pump_work_sec(int idx, uint32_t val);
 
+/**
+ * @brief 将所有配置恢复为 config.h 定义的出厂默认值并持久化写入 NVS
+ */
+void nvs_reset_to_factory_defaults();
+

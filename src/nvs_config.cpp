@@ -23,6 +23,7 @@ static const char NVS_KEY_DUR_1[]     = "dur_1";
 static const char NVS_KEY_PUMP_1[]    = "pump_1";
 static const char NVS_KEY_DUR_2[]     = "dur_2";
 static const char NVS_KEY_PUMP_2[]    = "pump_2";
+static const char NVS_KEY_BUILD_TIME[]= "bld_time";
 
 // ============================================================
 //  配置项内存缓存（内部私有）
@@ -39,26 +40,79 @@ static uint32_t s_expected_dur[3]  = { DEFAULT_EXPECTED_DUR_CH0, DEFAULT_EXPECTE
 static uint32_t s_pump_work_sec[3] = { DEFAULT_PUMP_WORK_SEC, DEFAULT_PUMP_WORK_SEC, DEFAULT_PUMP_WORK_SEC };
 
 // ============================================================
+//  恢复出厂默认值并写入 NVS
+// ============================================================
+void nvs_reset_to_factory_defaults() {
+    Serial.println("[NvsConfig] Resetting and writing factory defaults to NVS...");
+
+    s_sta_ssid     = FACTORY_WIFI_SSID;
+    s_sta_password = FACTORY_WIFI_PASSWORD;
+    s_sta_name     = FACTORY_DEVICE_NAME;
+    s_mqtt_broker  = FACTORY_MQTT_BROKER;
+    s_mqtt_port    = FACTORY_MQTT_PORT;
+    s_mqtt_user    = FACTORY_MQTT_USERNAME;
+    s_mqtt_pass    = FACTORY_MQTT_PASSWORD;
+
+    s_expected_dur[0] = DEFAULT_EXPECTED_DUR_CH0;
+    s_expected_dur[1] = DEFAULT_EXPECTED_DUR_CH1;
+    s_expected_dur[2] = DEFAULT_EXPECTED_DUR_CH2;
+
+    s_pump_work_sec[0] = DEFAULT_PUMP_WORK_SEC;
+    s_pump_work_sec[1] = DEFAULT_PUMP_WORK_SEC;
+    s_pump_work_sec[2] = DEFAULT_PUMP_WORK_SEC;
+
+    s_prefs.putString(NVS_KEY_SSID,      s_sta_ssid);
+    s_prefs.putString(NVS_KEY_PASS,      s_sta_password);
+    s_prefs.putString(NVS_KEY_NAME,      s_sta_name);
+    s_prefs.putString(NVS_KEY_BROKER,    s_mqtt_broker);
+    s_prefs.putInt(NVS_KEY_PORT,         s_mqtt_port);
+    s_prefs.putString(NVS_KEY_MQTT_USER, s_mqtt_user);
+    s_prefs.putString(NVS_KEY_MQTT_PASS, s_mqtt_pass);
+
+    s_prefs.putUInt(NVS_KEY_DUR_0,       s_expected_dur[0]);
+    s_prefs.putUInt(NVS_KEY_DUR_1,       s_expected_dur[1]);
+    s_prefs.putUInt(NVS_KEY_DUR_2,       s_expected_dur[2]);
+
+    s_prefs.putUInt(NVS_KEY_PUMP_0,      s_pump_work_sec[0]);
+    s_prefs.putUInt(NVS_KEY_PUMP_1,      s_pump_work_sec[1]);
+    s_prefs.putUInt(NVS_KEY_PUMP_2,      s_pump_work_sec[2]);
+
+    s_prefs.putString(NVS_KEY_BUILD_TIME, __DATE__ " " __TIME__);
+    Serial.println("[NvsConfig] Factory defaults successfully written to NVS.");
+}
+
+// ============================================================
 //  NVS 初始化
 // ============================================================
 void nvs_config_init() {
     s_prefs.begin(NVS_NAMESPACE, false);
 
-    s_sta_ssid     = s_prefs.getString(NVS_KEY_SSID,      FACTORY_WIFI_SSID);
-    s_sta_password = s_prefs.getString(NVS_KEY_PASS,      FACTORY_WIFI_PASSWORD);
-    s_sta_name     = s_prefs.getString(NVS_KEY_NAME,      FACTORY_DEVICE_NAME);
-    s_mqtt_broker  = s_prefs.getString(NVS_KEY_BROKER,    FACTORY_MQTT_BROKER);
-    s_mqtt_port    = s_prefs.getInt(NVS_KEY_PORT,         FACTORY_MQTT_PORT);
-    s_mqtt_user    = s_prefs.getString(NVS_KEY_MQTT_USER, FACTORY_MQTT_USERNAME);
-    s_mqtt_pass    = s_prefs.getString(NVS_KEY_MQTT_PASS, FACTORY_MQTT_PASSWORD);
+    const char current_build[] = __DATE__ " " __TIME__;
+    String saved_build = s_prefs.getString(NVS_KEY_BUILD_TIME, "");
 
-    s_expected_dur[0] = s_prefs.getUInt(NVS_KEY_DUR_0,   DEFAULT_EXPECTED_DUR_CH0);
-    s_expected_dur[1] = s_prefs.getUInt(NVS_KEY_DUR_1,   DEFAULT_EXPECTED_DUR_CH1);
-    s_expected_dur[2] = s_prefs.getUInt(NVS_KEY_DUR_2,   DEFAULT_EXPECTED_DUR_CH2);
+    if (saved_build != current_build) {
+        Serial.printf("[NvsConfig] New firmware build detected (Saved: '%s' vs Current: '%s').\n",
+                      saved_build.c_str(), current_build);
+        nvs_reset_to_factory_defaults();
+    } else {
+        Serial.printf("[NvsConfig] Firmware build unchanged ('%s'). Retaining existing config.\n",
+                      current_build);
+        s_sta_ssid     = s_prefs.getString(NVS_KEY_SSID,      FACTORY_WIFI_SSID);
+        s_sta_password = s_prefs.getString(NVS_KEY_PASS,      FACTORY_WIFI_PASSWORD);
+        s_sta_name     = s_prefs.getString(NVS_KEY_NAME,      FACTORY_DEVICE_NAME);
+        s_mqtt_broker  = s_prefs.getString(NVS_KEY_BROKER,    FACTORY_MQTT_BROKER);
+        s_mqtt_port    = s_prefs.getInt(NVS_KEY_PORT,         FACTORY_MQTT_PORT);
+        s_mqtt_user    = s_prefs.getString(NVS_KEY_MQTT_USER, FACTORY_MQTT_USERNAME);
+        s_mqtt_pass    = s_prefs.getString(NVS_KEY_MQTT_PASS, FACTORY_MQTT_PASSWORD);
 
-    s_pump_work_sec[0] = s_prefs.getUInt(NVS_KEY_PUMP_0, DEFAULT_PUMP_WORK_SEC);
-    s_pump_work_sec[1] = s_prefs.getUInt(NVS_KEY_PUMP_1, DEFAULT_PUMP_WORK_SEC);
-    s_pump_work_sec[2] = s_prefs.getUInt(NVS_KEY_PUMP_2, DEFAULT_PUMP_WORK_SEC);
+        s_expected_dur[0] = s_prefs.getUInt(NVS_KEY_DUR_0,   DEFAULT_EXPECTED_DUR_CH0);
+        s_expected_dur[1] = s_prefs.getUInt(NVS_KEY_DUR_1,   DEFAULT_EXPECTED_DUR_CH1);
+        s_expected_dur[2] = s_prefs.getUInt(NVS_KEY_DUR_2,   DEFAULT_EXPECTED_DUR_CH2);
+
+        s_pump_work_sec[0] = s_prefs.getUInt(NVS_KEY_PUMP_0, DEFAULT_PUMP_WORK_SEC);
+        s_pump_work_sec[1] = s_prefs.getUInt(NVS_KEY_PUMP_1, DEFAULT_PUMP_WORK_SEC);
+        s_pump_work_sec[2] = s_prefs.getUInt(NVS_KEY_PUMP_2, DEFAULT_PUMP_WORK_SEC);
+    }
 
     Serial.printf("[NvsConfig] Loaded WiFi STA SSID: %s\n", s_sta_ssid.c_str());
     Serial.printf("[NvsConfig] Station Name: %s, MQTT Broker: %s:%d\n",
