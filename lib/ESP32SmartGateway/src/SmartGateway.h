@@ -2,11 +2,22 @@
 #define SMART_GATEWAY_H
 
 #include <Arduino.h>
-#include <ESP32WifiMqttManager.h>
+#include <WiFi.h>
+#include <PubSubClient.h>
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
+#include <atomic>
+
+// 网络状态枚举（保持与主程序及 Web 端完全兼容）
+enum NetworkState {
+    STATE_DISCONNECTED,      // 完全断开
+    STATE_WIFI_CONNECTING,   // WiFi 正在尝试连接
+    STATE_WIFI_CONNECTED,    // WiFi 已连接成功，MQTT 未连接
+    STATE_MQTT_CONNECTING,   // WiFi 已连接，MQTT 正在尝试连接
+    STATE_MQTT_CONNECTED     // WiFi 与 MQTT 均已成功连接
+};
 
 // 传感器数据源类型
 enum class SensorSource {
@@ -14,7 +25,7 @@ enum class SensorSource {
     MQTT
 };
 
-// 智能网关配置结构体，解耦应用层与库文件
+// 智能网关配置结构体
 struct SmartGatewayConfig {
     // WiFi 与 MQTT 连接配置
     String wifiSsid;
@@ -43,6 +54,7 @@ public:
     typedef void (*ConfigPumpTimeCallback)(int sensorId, float pumpTimeSeconds);
 
     SmartGateway(SensorSource source = SensorSource::BLE);
+    ~SmartGateway();
 
     // 初始化网关（WiFi, MQTT, BLE）
     void begin(const SmartGatewayConfig& config);
@@ -81,14 +93,30 @@ private:
     ConfigPumpTimeCallback _pumpTimeCb = nullptr;
 
     WiFiClient _espClient;
-    ESP32WifiMqttManager _netManager;
+    PubSubClient _mqttClient;
+    SemaphoreHandle_t _mqttMutex = NULL;
+
     BLEScan* _pBLEScan = nullptr;
+
+    String _wifiSsid;
+    String _wifiPassword;
+    String _mqttBroker;
+    uint16_t _mqttPort = 1883;
+    String _mqttUsername;
+    String _mqttPassword;
 
     String _stationName;
     String _mqttSensorDataSub;
     String _targetBleName;
     uint16_t _bleCompanyIdVal = 0xFFFF;
     uint32_t _bleScanDurationS = 5;
+    uint32_t _mqttReconnectIntervalMs = 5000;
+
+    IPAddress _resolvedBrokerIp;
+    std::atomic<bool> _mqttConnecting{false};
+    unsigned long _lastDnsResolveMs = 0;
+    unsigned long _lastMqttReconnectAttempt = 0;
+    unsigned long _lastWifiReconnectAttempt = 0;
 
     uint8_t _lastSeqNum = -1;
     bool _bleConnected = false;
@@ -96,6 +124,7 @@ private:
     uint32_t _lastBlePacketTime = 0;
 
     void setupBLE();
+    IPAddress resolveBrokerIp();
     
     static void mqttCallback(char* topic, byte* payload, unsigned int length);
     static void scanCompleteCB(BLEScanResults results);
@@ -104,6 +133,8 @@ private:
     class AdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
         void onResult(BLEAdvertisedDevice advertisedDevice) override;
     };
+
+    friend void smartGatewayMqttTask(void* pvParameters);
 };
 
 #endif // SMART_GATEWAY_H

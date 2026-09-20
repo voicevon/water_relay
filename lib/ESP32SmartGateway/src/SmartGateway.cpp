@@ -4,6 +4,99 @@
 // 初始化单例指针
 SmartGateway* SmartGateway::_instance = nullptr;
 
+// ============================================================
+//  RAII 互斥锁辅助类（保证多任务访问 PubSubClient 线程安全）
+// ============================================================
+class MqttLock {
+public:
+    MqttLock(SemaphoreHandle_t mutex) : _mutex(mutex), _locked(false) {
+        if (_mutex) {
+            _locked = (xSemaphoreTake(_mutex, pdMS_TO_TICKS(3000)) == pdTRUE);
+            if (!_locked) {
+                Serial.println("[SmartGateway MQTT] WARN: MqttLock timeout (3s), skipping operation.");
+            }
+        }
+    }
+    ~MqttLock() {
+        if (_mutex && _locked) {
+            xSemaphoreGive(_mutex);
+        }
+    }
+    bool locked() const { return _locked; }
+private:
+    SemaphoreHandle_t _mutex;
+    bool _locked;
+};
+
+// ============================================================
+//  后台异步 DNS 解析与 MQTT 连接任务（FreeRTOS Task）
+// ============================================================
+void smartGatewayMqttTask(void* pvParameters) {
+    SmartGateway* gw = (SmartGateway*)pvParameters;
+    if (!gw) {
+        vTaskDelete(NULL);
+        return;
+    }
+
+    unsigned long now = millis();
+    // 断线重连时清空了 IP，将强制立即刷新 DNS 查询
+    if (gw->_resolvedBrokerIp[0] == 0 || (now - gw->_lastDnsResolveMs > 300000)) {
+        gw->_lastDnsResolveMs = now;
+        IPAddress tempIP = gw->resolveBrokerIp();
+        if (tempIP[0] != 0) {
+            gw->_resolvedBrokerIp = tempIP;
+            Serial.printf("[Gateway MQTT Task] DNS resolved IP: %s\n", tempIP.toString().c_str());
+        } else {
+            Serial.println("[Gateway MQTT Task] DNS resolution failed, will fallback to domain.");
+        }
+    }
+
+    {
+        MqttLock lock(gw->_mqttMutex);
+        if (lock.locked()) {
+            if (gw->_resolvedBrokerIp[0] != 0) {
+                gw->_mqttClient.setServer(gw->_resolvedBrokerIp, gw->_mqttPort);
+            } else {
+                gw->_mqttClient.setServer(gw->_mqttBroker.c_str(), gw->_mqttPort);
+            }
+
+            String clientId = "water_brain_client-" + String(random(0xffff), HEX);
+            Serial.println("[Gateway MQTT Task] Attempting connection to Broker...");
+
+            bool success;
+            if (gw->_mqttUsername.length() > 0 && gw->_mqttPassword.length() > 0) {
+                success = gw->_mqttClient.connect(clientId.c_str(), gw->_mqttUsername.c_str(), gw->_mqttPassword.c_str());
+            } else {
+                success = gw->_mqttClient.connect(clientId.c_str());
+            }
+
+            if (success) {
+                Serial.println("[Gateway MQTT Task] Connected successfully!");
+                // 核心关键：握手成功当场在锁内原子订阅水泵时长与数据配置主题！
+                String durationSub = "water/" + gw->_stationName + "/config/duration/+";
+                String pumpTimeSub = "water/" + gw->_stationName + "/config/pump_time/+";
+                gw->_mqttClient.subscribe(durationSub.c_str());
+                gw->_mqttClient.subscribe(pumpTimeSub.c_str());
+                Serial.printf("[Gateway MQTT Task] Subscribed to %s and %s\n", durationSub.c_str(), pumpTimeSub.c_str());
+
+                if (gw->_sensorSource == SensorSource::MQTT) {
+                    gw->_mqttClient.subscribe(gw->_mqttSensorDataSub.c_str());
+                    Serial.printf("[Gateway MQTT Task] Subscribed to %s\n", gw->_mqttSensorDataSub.c_str());
+                }
+            } else {
+                Serial.printf("[Gateway MQTT Task] Connection failed, state = %d\n", gw->_mqttClient.state());
+                // 连接失败，主动将 IP 清零，下次重连强制重新解析 DNS
+                gw->_resolvedBrokerIp = IPAddress(0, 0, 0, 0);
+                // 主动清理旧 socket
+                gw->_espClient.stop();
+            }
+        }
+    }
+
+    gw->_mqttConnecting = false;
+    vTaskDelete(NULL);
+}
+
 // BLE 异步扫描结束后的回调
 void SmartGateway::scanCompleteCB(BLEScanResults results) {
     BLEDevice::getScan()->clearResults(); // 清理扫描结果，释放内存
@@ -12,12 +105,37 @@ void SmartGateway::scanCompleteCB(BLEScanResults results) {
     }
 }
 
-SmartGateway::SmartGateway(SensorSource source) : _netManager(_espClient), _sensorSource(source) {
+SmartGateway::SmartGateway(SensorSource source) 
+    : _sensorSource(source), _mqttClient(_espClient) {
     _instance = this;
+    _mqttMutex = xSemaphoreCreateMutex();
     _lastSeqNum = -1;
     _bleConnected = false;
     _isScanning = false;
     _lastBlePacketTime = 0;
+    _resolvedBrokerIp = IPAddress(0, 0, 0, 0);
+}
+
+SmartGateway::~SmartGateway() {
+    if (_mqttMutex) {
+        vSemaphoreDelete(_mqttMutex);
+        _mqttMutex = NULL;
+    }
+}
+
+IPAddress SmartGateway::resolveBrokerIp() {
+    IPAddress resolvedIP;
+    if (resolvedIP.fromString(_mqttBroker.c_str())) {
+        return resolvedIP;
+    }
+    if (WiFi.hostByName(_mqttBroker.c_str(), resolvedIP)) {
+        Serial.printf("[Gateway DNS] Successfully resolved %s to %s via standard DNS\n", 
+                      _mqttBroker.c_str(), resolvedIP.toString().c_str());
+        return resolvedIP;
+    } else {
+        Serial.printf("[Gateway DNS] Standard DNS failed for %s\n", _mqttBroker.c_str());
+        return IPAddress(0, 0, 0, 0);
+    }
 }
 
 void SmartGateway::begin(const SmartGatewayConfig& config) {
@@ -26,49 +144,47 @@ void SmartGateway::begin(const SmartGatewayConfig& config) {
     _targetBleName = config.targetBleName;
     _bleCompanyIdVal = config.bleCompanyIdVal;
     _bleScanDurationS = config.bleScanDurationS;
+    _mqttReconnectIntervalMs = config.mqttReconnectIntervalMs;
 
-    NetworkConfig netConfig;
-    static String s_ssid;
-    static String s_pass;
-    static String s_broker;
-    static String s_user;
-    static String s_pass_mqtt;
+    _wifiSsid = config.wifiSsid;
+    _wifiPassword = config.wifiPassword;
+    _mqttBroker = config.mqttBroker;
+    _mqttPort = config.mqttPort;
+    _mqttUsername = config.mqttUsername;
+    _mqttPassword = config.mqttPassword;
 
-    s_ssid = config.wifiSsid;
-    s_pass = config.wifiPassword;
-    s_broker = config.mqttBroker;
-    s_user = config.mqttUsername;
-    s_pass_mqtt = config.mqttPassword;
+    _mqttClient.setCallback(mqttCallback);
 
-    netConfig.wifiSsid = s_ssid.c_str();
-    netConfig.wifiPassword = s_pass.c_str();
-    netConfig.mqttBroker = s_broker.c_str();
-    netConfig.mqttPort = config.mqttPort;
-    netConfig.mqttUsername = s_user.c_str();
-    netConfig.mqttPassword = s_pass_mqtt.c_str();
-    netConfig.clientIdPrefix = "water_brain_client";
-    netConfig.wifiReconnectIntervalMs = 20000;
-    netConfig.mqttReconnectIntervalMs = config.mqttReconnectIntervalMs;
+    // 保持 AP_STA 模式，确保 Web 配置后台热点稳定可用
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.begin(_wifiSsid.c_str(), _wifiPassword.c_str());
 
-    _netManager.begin(netConfig);
+    // 阻塞等待连接，最多 20 次 × 500ms = 10s
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+    }
 
-    // 订阅主题注册回调
-    _netManager.onStateChange([](NetworkState state) {
-        if (state == STATE_MQTT_CONNECTED) {
-            if (_instance) {
-                // 动态构建订阅主题
-                String durationSub = "water/" + _instance->_stationName + "/config/duration/+";
-                String pumpTimeSub = "water/" + _instance->_stationName + "/config/pump_time/+";
-                _instance->_netManager.subscribe(durationSub.c_str());
-                _instance->_netManager.subscribe(pumpTimeSub.c_str());
-                if (_instance->_sensorSource == SensorSource::MQTT) {
-                    _instance->_netManager.subscribe(_instance->_mqttSensorDataSub.c_str());
-                }
-            }
-        }
-    });
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println();
+        Serial.print("[SmartGateway WiFi] Connected. IP: ");
+        Serial.println(WiFi.localIP());
+    } else {
+        Serial.println();
+        Serial.println("[SmartGateway WiFi] Connect failed. Will retry in background.");
+    }
 
-    _netManager.setMqttCallback(mqttCallback);
+    // 初始解析 Broker IP
+    IPAddress brokerIP = resolveBrokerIp();
+    if (brokerIP[0] != 0) {
+        _resolvedBrokerIp = brokerIP;
+        _lastDnsResolveMs = millis();
+        _mqttClient.setServer(brokerIP, _mqttPort);
+    } else {
+        _mqttClient.setServer(_mqttBroker.c_str(), _mqttPort);
+    }
 
     if (_sensorSource == SensorSource::BLE) {
         setupBLE();
@@ -76,17 +192,60 @@ void SmartGateway::begin(const SmartGatewayConfig& config) {
 }
 
 void SmartGateway::loop() {
-    _netManager.loop();
+    unsigned long now = millis();
 
+    // 1. 维护 WiFi 自动重连
+    if (WiFi.status() != WL_CONNECTED) {
+        if (now - _lastWifiReconnectAttempt >= 20000UL) {
+            _lastWifiReconnectAttempt = now;
+            Serial.println("[SmartGateway WiFi] Disconnected. Reconnecting...");
+            WiFi.begin(_wifiSsid.c_str(), _wifiPassword.c_str());
+        }
+    } else {
+        _lastWifiReconnectAttempt = now;
+
+        // 2. 主线程避让：后台连接任务执行中直接跳过，绝不并发触碰 _mqttClient
+        if (!_mqttConnecting) {
+            bool connected = false;
+            {
+                MqttLock lock(_mqttMutex);
+                if (lock.locked()) {
+                    connected = _mqttClient.connected();
+                }
+            }
+
+            if (!connected) {
+                // 断线时清空 IP 缓存，下次重连立即刷新 DDNS 解析
+                _resolvedBrokerIp = IPAddress(0, 0, 0, 0);
+
+                if (now - _lastMqttReconnectAttempt >= _mqttReconnectIntervalMs) {
+                    _lastMqttReconnectAttempt = now;
+                    _mqttConnecting = true;
+
+                    BaseType_t ret = xTaskCreate(smartGatewayMqttTask, "gw_mqtt_task", 8192, this, 1, NULL);
+                    if (ret != pdPASS) {
+                        _mqttConnecting = false;
+                        Serial.println("[SmartGateway MQTT] Error: Failed to create MQTT task!");
+                    }
+                }
+            } else {
+                // 已连接，维持保活
+                MqttLock lock(_mqttMutex);
+                if (lock.locked()) {
+                    _mqttClient.loop();
+                }
+            }
+        }
+    }
+
+    // 3. BLE 扫描处理
     if (_sensorSource == SensorSource::BLE) {
-        // 触发定时扫描 (非阻塞异步方式)
         if (_pBLEScan && !_isScanning) {
             _isScanning = true;
             _pBLEScan->start(_bleScanDurationS, scanCompleteCB, false);
         }
 
-        // 检测 BLE 连接心跳超时（超过 15 秒未收到包则判定为断开）
-        if (_bleConnected && (millis() - _lastBlePacketTime > 15000)) {
+        if (_bleConnected && (now - _lastBlePacketTime > 15000)) {
             _bleConnected = false;
             Serial.println("[BLE DEBUG] BLE connection timeout, set status to disconnected.");
         }
@@ -106,11 +265,17 @@ void SmartGateway::onConfigPumpTime(ConfigPumpTimeCallback cb) {
 }
 
 bool SmartGateway::publishStatus(const char* jsonPayload) {
+    if (_mqttConnecting) return false;
+    MqttLock lock(_mqttMutex);
+    if (!lock.locked() || !_mqttClient.connected()) return false;
     String topic = "water/" + _stationName + "/system/status";
-    return _netManager.publish(topic.c_str(), (const uint8_t*)jsonPayload, strlen(jsonPayload), true);
+    return _mqttClient.publish(topic.c_str(), (const uint8_t*)jsonPayload, strlen(jsonPayload), true);
 }
 
 bool SmartGateway::publishSensorState(int sensorId, int stage, const char* remark, float duration, int pumpTime, uint32_t uptime, uint32_t stageStartSec) {
+    if (_mqttConnecting) return false;
+    MqttLock lock(_mqttMutex);
+    if (!lock.locked() || !_mqttClient.connected()) return false;
     String topic = "water/" + _stationName + "/state";
     StaticJsonDocument<256> doc;
     doc["sensorId"] = sensorId;
@@ -122,12 +287,15 @@ bool SmartGateway::publishSensorState(int sensorId, int stage, const char* remar
     doc["stageStartSec"] = stageStartSec;
     String jsonPayload;
     serializeJson(doc, jsonPayload);
-    return _netManager.publish(topic.c_str(), (const uint8_t*)jsonPayload.c_str(), jsonPayload.length(), true);
+    return _mqttClient.publish(topic.c_str(), (const uint8_t*)jsonPayload.c_str(), jsonPayload.length(), true);
 }
 
 bool SmartGateway::publishPhotoTake(const char* targetStation) {
+    if (_mqttConnecting) return false;
+    MqttLock lock(_mqttMutex);
+    if (!lock.locked() || !_mqttClient.connected()) return false;
     String topic = "water/photo/take";
-    return _netManager.publish(topic.c_str(), (const uint8_t*)targetStation, strlen(targetStation), false);
+    return _mqttClient.publish(topic.c_str(), (const uint8_t*)targetStation, strlen(targetStation), false);
 }
 
 bool SmartGateway::isBleConnected() const {
@@ -135,7 +303,17 @@ bool SmartGateway::isBleConnected() const {
 }
 
 NetworkState SmartGateway::getNetworkState() {
-    return _netManager.getState();
+    if (WiFi.status() != WL_CONNECTED) {
+        return STATE_DISCONNECTED;
+    }
+    if (_mqttConnecting) {
+        return STATE_MQTT_CONNECTING;
+    }
+    MqttLock lock(_mqttMutex);
+    if (lock.locked() && _mqttClient.connected()) {
+        return STATE_MQTT_CONNECTED;
+    }
+    return STATE_WIFI_CONNECTED;
 }
 
 void SmartGateway::mqttCallback(char* topic, byte* payload, unsigned int length) {
@@ -220,8 +398,6 @@ void SmartGateway::AdvertisedDeviceCallbacks::onResult(BLEAdvertisedDevice adver
                         uint16_t sensor2 = ((uint8_t)data[4] << 8) | (uint8_t)data[5];
                         uint16_t sensor3 = ((uint8_t)data[6] << 8) | (uint8_t)data[7];
                         uint8_t stateByte = (data.length() == 10) ? (uint8_t)data[8] : 0;
-
-                        // Serial.printf("[GATEWAY BLE] 接收到唯一广播包, seqNum=%u, stateByte=0x%02X\n", seqNum, stateByte);
 
                         if (_instance->_sensorCb) {
                             _instance->_sensorCb(sensor1, sensor2, sensor3, stateByte);
