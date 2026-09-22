@@ -58,6 +58,9 @@ public:
 
     // 初始化网关（WiFi, MQTT, BLE）
     void begin(const SmartGatewayConfig& config);
+
+    // 立即更新 WiFi 凭据并重连（Web 配置保存后调用，无需重启）
+    void updateWifiCredentials(const String& ssid, const String& pass);
     
     // 心跳维护函数，需在主循环中非阻塞调用
     void loop();

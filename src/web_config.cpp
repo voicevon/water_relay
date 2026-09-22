@@ -109,6 +109,8 @@ static void handle_post_sysconfig() {
 
     if (changed) {
         Serial.println("[WebConfig] System & Network credentials updated to NVS.");
+        // 立即应用新 WiFi 配置：无需等待下一轮重连或重启
+        gateway.updateWifiCredentials(get_sta_ssid(), get_sta_password());
     }
     s_server.send(200, "text/plain", "OK");
 }

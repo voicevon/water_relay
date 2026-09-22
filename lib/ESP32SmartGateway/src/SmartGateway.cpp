@@ -1,6 +1,16 @@
 #include "SmartGateway.h"
 #include <ArduinoJson.h>
 
+// WiFi 重连退避参数（#ifndef 便于外部覆盖）：基础间隔起指数退避
+// （20s→40s→80s→160s→320s 封顶），避免 STA 反复扫描占用射频导致 AP beacon 缺帧
+#ifndef WIFI_RECONNECT_BASE_MS
+#define WIFI_RECONNECT_BASE_MS           20000UL
+#define WIFI_RECONNECT_BACKOFF_MAX_SHIFT 4
+#endif
+
+// WiFi 重连连续失败计数（指数退避用）
+static uint8_t s_wifi_fail_count = 0;
+
 // 初始化单例指针
 SmartGateway* SmartGateway::_instance = nullptr;
 
@@ -157,6 +167,9 @@ void SmartGateway::begin(const SmartGatewayConfig& config) {
 
     // 保持 AP_STA 模式，确保 Web 配置后台热点稳定可用
     WiFi.mode(WIFI_AP_STA);
+    // 关闭 SDK 内部自动重连：其后台高频全信道扫描会占用射频，
+    // 导致 AP beacon 缺帧、电脑扫不到热点。重连节奏由 loop() 控制
+    WiFi.setAutoReconnect(false);
     WiFi.begin(_wifiSsid.c_str(), _wifiPassword.c_str());
 
     // 阻塞等待连接，最多 20 次 × 500ms = 10s
@@ -191,18 +204,33 @@ void SmartGateway::begin(const SmartGatewayConfig& config) {
     }
 }
 
+void SmartGateway::updateWifiCredentials(const String& ssid, const String& pass) {
+    _wifiSsid = ssid;
+    _wifiPassword = pass;
+    WiFi.begin(_wifiSsid.c_str(), _wifiPassword.c_str());
+    Serial.printf("[SmartGateway WiFi] Credentials updated, reconnecting to \"%s\"...\n",
+                  _wifiSsid.c_str());
+}
+
 void SmartGateway::loop() {
     unsigned long now = millis();
 
-    // 1. 维护 WiFi 自动重连
+    // 1. 维护 WiFi 自动重连（指数退避：失败越多间隔越长，
+    //    退避窗口内射频安静，保证 AP 热点稳定广播可被扫描）
     if (WiFi.status() != WL_CONNECTED) {
-        if (now - _lastWifiReconnectAttempt >= 20000UL) {
+        uint8_t shift = s_wifi_fail_count < WIFI_RECONNECT_BACKOFF_MAX_SHIFT
+                        ? s_wifi_fail_count : WIFI_RECONNECT_BACKOFF_MAX_SHIFT;
+        unsigned long interval = WIFI_RECONNECT_BASE_MS << shift;
+        if (now - _lastWifiReconnectAttempt >= interval) {
             _lastWifiReconnectAttempt = now;
-            Serial.println("[SmartGateway WiFi] Disconnected. Reconnecting...");
+            s_wifi_fail_count++;
+            Serial.printf("[SmartGateway WiFi] Disconnected. Reconnecting (fail=%u, next in %lus)...\n",
+                          s_wifi_fail_count, interval / 1000UL);
             WiFi.begin(_wifiSsid.c_str(), _wifiPassword.c_str());
         }
     } else {
         _lastWifiReconnectAttempt = now;
+        s_wifi_fail_count = 0;
 
         // 2. 主线程避让：后台连接任务执行中直接跳过，绝不并发触碰 _mqttClient
         if (!_mqttConnecting) {
