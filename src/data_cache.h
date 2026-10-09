@@ -6,11 +6,11 @@
 //  3路传感器输入数据缓存结构
 // ============================================================
 struct SensorCache {
-    uint16_t raw_val;    // 原始值
-    uint16_t filtered;   // 滤波后值
-    uint16_t baseline;   // 基准值
-    uint16_t threshold;  // 触发阈值
-    bool     detected;   // 是否有水
+    int32_t raw_val;    // 原始值 (支持 24位有符号数)
+    int32_t filtered;   // 滤波后值
+    int32_t baseline;   // 基准值
+    int32_t threshold;  // 触发阈值
+    bool    detected;   // 是否有水
 };
 
 // ============================================================
@@ -27,8 +27,8 @@ struct RelayCache {
 /**
  * @brief 更新传感器数据缓存（供 web_config.cpp 中 /api/data handler 使用）
  */
-void data_cache_update_sensor(int idx, uint16_t raw_val, uint16_t filtered,
-                               uint16_t baseline, uint16_t threshold, bool detected);
+void data_cache_update_sensor(int idx, int32_t raw_val, int32_t filtered,
+                               int32_t baseline, int32_t threshold, bool detected);
 
 /**
  * @brief 更新继电器/水泵状态缓存

@@ -48,8 +48,8 @@ struct SmartGatewayConfig {
 
 class SmartGateway {
 public:
-    // 事件回调函数指针定义
-    typedef void (*SensorDataCallback)(uint16_t sensor1, uint16_t sensor2, uint16_t sensor3, uint8_t stateByte);
+    // 事件回调函数指针定义 (支持 16位无符号及 24位有符号传感器读数)
+    typedef void (*SensorDataCallback)(int32_t sensor1, int32_t sensor2, int32_t sensor3, uint8_t stateByte);
     typedef void (*ConfigDurationCallback)(int sensorId, float durationMinutes);
     typedef void (*ConfigPumpTimeCallback)(int sensorId, float pumpTimeSeconds);
 

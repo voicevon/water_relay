@@ -232,8 +232,8 @@ void web_config_loop() {
 // ============================================================
 //  web_config.h 中声明的缓存更新接口（转发至 data_cache）
 // ============================================================
-void web_config_update_sensor(int idx, uint16_t raw_val, uint16_t filtered,
-                               uint16_t baseline, uint16_t threshold, bool detected) {
+void web_config_update_sensor(int idx, int32_t raw_val, int32_t filtered,
+                               int32_t baseline, int32_t threshold, bool detected) {
     data_cache_update_sensor(idx, raw_val, filtered, baseline, threshold, detected);
 }
 

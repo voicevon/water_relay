@@ -361,9 +361,9 @@ void SmartGateway::handleMqttMessage(char* topic, byte* payload, unsigned int le
         if (!error) {
             const char* name = doc["name"] | "";
             if (strcmp(name, stationName.c_str()) == 0) {
-                uint16_t sensor1 = doc["sensor1"] | 0;
-                uint16_t sensor2 = doc["sensor2"] | 0;
-                uint16_t sensor3 = doc["sensor3"] | 0;
+                int32_t sensor1 = doc["sensor1"] | 0;
+                int32_t sensor2 = doc["sensor2"] | 0;
+                int32_t sensor3 = doc["sensor3"] | 0;
                 uint8_t stateByte = doc["state"] | 0;
                 if (_sensorCb) {
                     _sensorCb(sensor1, sensor2, sensor3, stateByte);
@@ -407,25 +407,35 @@ void SmartGateway::setupBLE() {
     _pBLEScan->setWindow(99);
 }
 
+// 内部辅助：大端序 24 位有符号整型解码（补码符号扩展）
+static inline int32_t parse_int24_be(uint8_t b0, uint8_t b1, uint8_t b2) {
+    int32_t val = ((int32_t)b0 << 16) | ((int32_t)b1 << 8) | (int32_t)b2;
+    if (val & 0x800000) {
+        val |= (int32_t)0xFF000000;
+    }
+    return val;
+}
+
 void SmartGateway::AdvertisedDeviceCallbacks::onResult(BLEAdvertisedDevice advertisedDevice) {
     if (_instance && advertisedDevice.getName() == _instance->_targetBleName.c_str()) {
         if (advertisedDevice.haveManufacturerData()) {
             std::string data = advertisedDevice.getManufacturerData();
-            if (data.length() == 9 || data.length() == 10) {
+            // 13 字节（新版 24 位有符号原生数据直通协议）
+            if (data.length() == 13) {
                 uint8_t cIdLsb = (uint8_t)data[0];
                 uint8_t cIdMsb = (uint8_t)data[1];
                 uint16_t cId = (cIdMsb << 8) | cIdLsb;
                 if (cId == _instance->_bleCompanyIdVal) {
-                    uint8_t seqNum = (data.length() == 10) ? (uint8_t)data[9] : (uint8_t)data[8];
+                    uint8_t seqNum = (uint8_t)data[12];
                     if (seqNum != _instance->_lastSeqNum) {
                         _instance->_lastSeqNum = seqNum;
                         _instance->_bleConnected = true;
                         _instance->_lastBlePacketTime = millis();
 
-                        uint16_t sensor1 = ((uint8_t)data[2] << 8) | (uint8_t)data[3];
-                        uint16_t sensor2 = ((uint8_t)data[4] << 8) | (uint8_t)data[5];
-                        uint16_t sensor3 = ((uint8_t)data[6] << 8) | (uint8_t)data[7];
-                        uint8_t stateByte = (data.length() == 10) ? (uint8_t)data[8] : 0;
+                        int32_t sensor1 = parse_int24_be((uint8_t)data[2], (uint8_t)data[3], (uint8_t)data[4]);
+                        int32_t sensor2 = parse_int24_be((uint8_t)data[5], (uint8_t)data[6], (uint8_t)data[7]);
+                        int32_t sensor3 = parse_int24_be((uint8_t)data[8], (uint8_t)data[9], (uint8_t)data[10]);
+                        uint8_t stateByte = (uint8_t)data[11];
 
                         if (_instance->_sensorCb) {
                             _instance->_sensorCb(sensor1, sensor2, sensor3, stateByte);

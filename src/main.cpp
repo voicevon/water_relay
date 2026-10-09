@@ -20,8 +20,8 @@ const int STAGE_LED_PINS[10] = {
 //  全局对象与变量定义
 // ============================================================================
 
-// 3路传感器输入数据及有无水状态缓存 (数据计算已移至 sensor 节点)
-uint16_t g_sensor_values[3] = {0, 0, 0};
+// 3路传感器输入数据及有无水状态缓存 (数据计算已移至 sensor 节点，支持 int32_t)
+int32_t g_sensor_values[3] = {0, 0, 0};
 bool g_sensor_states[3] = {false, false, false};
 
 // 3路水泵传感器对应的传感器物理通道映射关系
@@ -45,7 +45,7 @@ int lastStages[3] = {-1, -1, -1};
 // ============================================================================
 
 // 1. 接收到网关传感器数据 (含节点端判定好的状态位)
-void handleSensorData(uint16_t sensor1, uint16_t sensor2, uint16_t sensor3, uint8_t stateByte) {
+void handleSensorData(int32_t sensor1, int32_t sensor2, int32_t sensor3, uint8_t stateByte) {
     g_sensor_values[0] = sensor1;
     g_sensor_values[1] = sensor2;
     g_sensor_values[2] = sensor3;

@@ -25,7 +25,7 @@ String get_sta_password();
 /**
  * @brief 更新指定物理通道的实时传感器数据，供网页 API 查询
  */
-void web_config_update_sensor(int idx, uint16_t raw_val, uint16_t filtered, uint16_t baseline, uint16_t threshold, bool detected);
+void web_config_update_sensor(int idx, int32_t raw_val, int32_t filtered, int32_t baseline, int32_t threshold, bool detected);
 
 /**
  * @brief 更新继电器/水泵通道的实时状态，供网页 API 查询
